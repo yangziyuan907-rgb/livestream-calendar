@@ -1,0 +1,80 @@
+name: Sync DingTalk Schedule & Deploy Calendar
+
+on:
+  schedule:
+    # 每 30 分钟自动同步一次（GitHub Actions 免费额度足够高频运行）
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+  repository_dispatch:
+    # 支持在钉钉多维表「自动化」里配置 Webhook 实时触发更新
+    types: [dingtalk-updated]
+  push:
+    branches: [main]
+    paths:
+      - "data/**"
+      - "docs/**"
+      - "scripts/**"
+      - ".github/workflows/sync-calendar.yml"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages-sync"
+  cancel-in-progress: false
+
+jobs:
+  sync-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Sync schedule from DingTalk AI Table (or CSV fallback)
+        env:
+          DINGTALK_APP_KEY: ${{ secrets.DINGTALK_APP_KEY }}
+          DINGTALK_APP_SECRET: ${{ secrets.DINGTALK_APP_SECRET }}
+          DINGTALK_OPERATOR_ID: ${{ secrets.DINGTALK_OPERATOR_ID }}
+          DINGTALK_MOBILE: ${{ secrets.DINGTALK_MOBILE }}
+          DINGTALK_BASE_ID: ${{ vars.DINGTALK_BASE_ID || 'MNDoBb60VLrYNqLqInx6PzPA8lemrZQ3' }}
+          DINGTALK_SHEET_ID: ${{ vars.DINGTALK_SHEET_ID || 'AEFsFrm' }}
+          DINGTALK_SOURCE_URL: ${{ vars.DINGTALK_SOURCE_URL || 'https://alidocs.dingtalk.com/i/nodes/MNDoBb60VLrYNqLqInx6PzPA8lemrZQ3?utm_scene=person_space&iframeQuery=viewId%3Dc9vuiLa%26sheetId%3DAEFsFrm' }}
+        run: python3 scripts/sync_dingtalk.py
+
+      - name: Commit updated schedule snapshot (if changed)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/data/schedule.json docs/data/schedule-data.js docs/calendar.ics
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(schedule): auto-sync DingTalk livestream calendar"
+            git push
+          else
+            echo "No schedule changes detected."
+          fi
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+  deploy:
+    needs: sync-and-build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
