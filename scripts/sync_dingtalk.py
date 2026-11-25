@@ -868,32 +868,55 @@ def parse_weekly_calendar_grid(
     return records
 
 
-def _category_compatible(ev_type: str, ev_title: str, sup_cat: str, sup_title: str = "") -> int:
-    """Return compatibility score (>0 compatible, <0 incompatible, 0 neutral)."""
-    et = (ev_type or "") + " " + (ev_title or "")
-    sc = (sup_cat or "") + " " + (sup_title or "")
+def _norm_title(text: str) -> str:
+    """Normalize a livestream title for duplicate/identity matching."""
+    s = (text or "").strip().lower()
+    s = re.sub(r"[【】\[\]（）()《》<>·—–\-:：、，,\s]+", "", s)
+    for noise in ("公开直播", "非公开直播", "已定", "待定", "专业课", "高价课", "未命名"):
+        s = s.replace(noise, "")
+    return s
 
+
+def _titles_refer_same(title_a: str, title_b: str) -> bool:
+    na, nb = _norm_title(title_a), _norm_title(title_b)
+    if not na or not nb:
+        return False
+    if na == nb:
+        return True
+    if min(len(na), len(nb)) >= 3 and (na in nb or nb in na):
+        return True
+    return False
+
+
+def _category_compatible(ev_type: str, ev_title: str, sup_cat: str, sup_title: str = "") -> int:
+    """Return compatibility score (>0 compatible, <0 incompatible, 0 neutral).
+
+    Checks title keywords before sheet row category so a `【平台产品】` placed inside
+    a `专业课` weekly-grid row is still recognized as `平台产品`.
+    """
     groups = [
-        ("专业课", ("专业课", "高价课", "训练营线索", "催眠", "短焦", "CBT", "家庭治疗", "儿童分析师")),
+        ("平台产品", ("平台产品",)),
         ("百场督导", ("百场督导", "咨询观摩", "督导教学", "闭门会")),
         ("团督", ("团督",)),
         ("咨询伦理", ("伦理",)),
         ("朝阳", ("朝阳", "初心咨询", "壹心理", "低转高", "学员访谈")),
-        ("平台产品", ("平台产品",)),
+        ("专业课", ("专业课", "高价课", "训练营线索", "催眠", "短焦", "CBT", "家庭治疗", "儿童分析师")),
     ]
 
-    def detect_group(text: str) -> str:
-        for gname, kws in groups:
-            if any(kw in text for kw in kws):
-                return gname
+    def detect_group(primary: str, secondary: str) -> str:
+        for text in (primary, secondary):
+            if not text:
+                continue
+            for gname, kws in groups:
+                if any(kw in text for kw in kws):
+                    return gname
         return ""
 
-    g_ev = detect_group(et)
-    g_sup = detect_group(sc)
+    g_ev = detect_group(ev_title or "", ev_type or "")
+    g_sup = detect_group(sup_title or "", sup_cat or "")
     if g_ev and g_sup:
         if g_ev == g_sup:
             return 30
-        # 专业课训练营/高价课 vs 朝阳训练营 are distinct
         return -40
     return 0
 
@@ -902,7 +925,7 @@ def _keyword_overlap_score(text_a: str, text_b: str) -> int:
     if not text_a or not text_b:
         return 0
     keywords = [
-        "CBT", "催眠", "短焦", "家庭治疗", "儿童分析师", "汤海鹏", "张海音", "张敬轩", "洪伟凯",
+        "平台产品", "CBT", "催眠", "短焦", "家庭治疗", "儿童分析师", "汤海鹏", "张海音", "张敬轩", "洪伟凯",
         "付艳", "王灵", "许静", "童俊", "司雅梅", "高岚", "督导教学", "咨询观摩", "闭门会",
         "伴侣治疗", "伦理", "初心", "壹心理", "自讲", "公开课", "答疑", "访谈", "低转高", "团督",
     ]
@@ -952,6 +975,9 @@ def _normalize_live_type(category: str, title_hint: str = "") -> str:
 def _apply_grid_to_event(ev: Dict[str, Any], g: Dict[str, Any]) -> None:
     if "咨询师之家直播时间表" not in ev["supplementSources"]:
         ev["supplementSources"].append("咨询师之家直播时间表")
+    if not ev["title"] and g.get("titleHint"):
+        ev["title"] = g["titleHint"]
+        ev["displayTitle"] = g["titleHint"]
     if not ev["speaker"] and g["speaker"]:
         ev["speaker"] = g["speaker"]
     if not ev["host"] and g["host"]:
@@ -971,13 +997,16 @@ def _apply_grid_to_event(ev: Dict[str, Any], g: Dict[str, Any]) -> None:
                 ev["appAccount"] = "咨询师之家APP"
         if not ev["videoAccount"] and "视频号" in g["broadcastMode"]:
             ev["videoAccount"] = "咨询师之家"
-    if g["scheduleNote"]:
+    if g["scheduleNote"] and not ev["scheduleNote"]:
         ev["scheduleNote"] = g["scheduleNote"]
 
 
 def _apply_pro_to_event(ev: Dict[str, Any], p: Dict[str, Any]) -> None:
     if "专业课直播汇总表" not in ev["supplementSources"]:
         ev["supplementSources"].append("专业课直播汇总表")
+    if not ev["title"] and p.get("coursePrice"):
+        ev["title"] = p["coursePrice"]
+        ev["displayTitle"] = p["coursePrice"]
     if not ev["speaker"] and p["speaker"]:
         ev["speaker"] = p["speaker"]
     if not ev["host"] and p["host"]:
@@ -994,6 +1023,40 @@ def _apply_pro_to_event(ev: Dict[str, Any], p: Dict[str, Any]) -> None:
         not ev["inviteStatus"] or (ev["inviteStatus"] == "未邀约" and "已邀约" in p["inviteStatus"])
     ):
         ev["inviteStatus"] = "已邀约" if "已邀约" in p["inviteStatus"] else p["inviteStatus"]
+
+
+def _same_speaker(a: str, b: str) -> bool:
+    sa, sb = (a or "").strip(), (b or "").strip()
+    return bool(sa and sb and (sa in sb or sb in sa))
+
+
+def _is_duplicate_of_existing(cand_ev: Dict[str, Any], existing_list: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Return an existing event on the same date if cand_ev represents the same session."""
+    for ex in existing_list:
+        if ex["date"] != cand_ev["date"]:
+            continue
+        t_score = _times_compatible(ex["start"], ex["end"], cand_ev["start"], cand_ev["end"])
+        if t_score < 0:
+            continue
+        same_spk = _same_speaker(ex["speaker"], cand_ev["speaker"])
+        same_ttl = _titles_refer_same(ex["displayTitle"], cand_ev["displayTitle"])
+        kw_hit = _keyword_overlap_score(ex["displayTitle"], cand_ev["displayTitle"]) >= 25
+        same_room = bool(ex["room"] and cand_ev["room"] and ex["room"] == cand_ev["room"])
+        same_type = bool(ex["type"] and cand_ev["type"] and ex["type"] == cand_ev["type"])
+
+        # Same date + overlapping time + (same speaker OR same title) => definitely same session
+        if t_score >= 30 and (same_spk or same_ttl):
+            return ex
+        # Same date + exact start time + same room + (same category or keyword overlap)
+        if t_score >= 50 and same_room and (same_type or kw_hit):
+            return ex
+        # Same date + exact start time + same title keyword + same category (e.g. room updated in main table)
+        if t_score >= 50 and kw_hit and same_type and not (ex["speaker"] and cand_ev["speaker"] and not same_spk):
+            return ex
+        # Untimed candidate matching same date + same speaker + same title/type
+        if t_score == 0 and same_spk and (same_ttl or same_type):
+            return ex
+    return None
 
 
 def _build_event_from_grid(g: Dict[str, Any], seq: int) -> Dict[str, Any]:
@@ -1130,18 +1193,24 @@ def merge_supplements(
             t_score = _times_compatible(ev["start"], ev["end"], cand["start"], cand["end"])
             if t_score < 0:
                 continue
-            if ev["room"] and cand["room"] and ev["room"] != cand["room"]:
-                continue
-            if ev["speaker"] and cand["speaker"] and ev["speaker"] not in cand["speaker"] and cand["speaker"] not in ev["speaker"]:
-                continue
+            same_spk = _same_speaker(ev["speaker"], cand["speaker"])
+            same_ttl = _titles_refer_same(ev["displayTitle"], cand["titleHint"])
+            strong_identity = t_score >= 30 and (same_spk or same_ttl)
+
+            if not strong_identity:
+                if ev["room"] and cand["room"] and ev["room"] != cand["room"]:
+                    continue
+                if ev["speaker"] and cand["speaker"] and not same_spk:
+                    continue
 
             cat_score = _category_compatible(ev["type"], ev["displayTitle"], cand["category"], cand["titleHint"])
-            if cat_score < 0:
+            if cat_score < 0 and not strong_identity:
                 continue
             kw_score = _keyword_overlap_score(ev["displayTitle"], cand["titleHint"] + " " + cand["scheduleNote"])
-            spk_bonus = 40 if (ev["speaker"] and cand["speaker"] and (ev["speaker"] in cand["speaker"] or cand["speaker"] in ev["speaker"])) else 0
+            spk_bonus = 60 if same_spk else 0
+            ttl_bonus = 50 if same_ttl else 0
             room_bonus = 10 if (ev["room"] and cand["room"] and ev["room"] == cand["room"]) else 0
-            score = t_score + cat_score + kw_score + spk_bonus + room_bonus
+            score = t_score + max(cat_score, 0) + kw_score + spk_bonus + ttl_bonus + room_bonus
             threshold = 50 if not cand["start"] else 55
             if score >= threshold and score > best_grid_score:
                 best_grid_score = score
@@ -1163,14 +1232,18 @@ def merge_supplements(
             t_score = _times_compatible(ev["start"], ev["end"], cand["start"], cand["end"])
             if t_score < 0:
                 continue
-            if ev["speaker"] and cand["speaker"] and ev["speaker"] not in cand["speaker"] and cand["speaker"] not in ev["speaker"]:
+            same_spk = _same_speaker(ev["speaker"], cand["speaker"])
+            same_ttl = _titles_refer_same(ev["displayTitle"], cand["coursePrice"])
+            strong_identity = t_score >= 30 and (same_spk or same_ttl)
+            if ev["speaker"] and cand["speaker"] and not same_spk:
                 continue
             cat_score = _category_compatible(ev["type"], ev["displayTitle"], cand["category"], cand["coursePrice"])
-            if cat_score < 0:
+            if cat_score < 0 and not strong_identity:
                 continue
             kw_score = _keyword_overlap_score(ev["displayTitle"], cand["coursePrice"] + " " + cand["speaker"])
-            spk_bonus = 40 if (ev["speaker"] and cand["speaker"] and (ev["speaker"] in cand["speaker"] or cand["speaker"] in ev["speaker"])) else 0
-            score = t_score + cat_score + kw_score + spk_bonus
+            spk_bonus = 60 if same_spk else 0
+            ttl_bonus = 50 if same_ttl else 0
+            score = t_score + max(cat_score, 0) + kw_score + spk_bonus + ttl_bonus
             if score >= 55 and score > best_pro_score:
                 best_pro_score = score
                 best_pro = cand
@@ -1181,13 +1254,20 @@ def merge_supplements(
             enriched_from_pro += 1
             _apply_pro_to_event(ev, best_pro)
 
-        # Recompute anomalies if room was filled in by supplement
+        # Recompute anomalies if room or title was filled in by supplement
         if ev["room"] and "未分配直播间" in ev["anomalyReasons"]:
             ev["anomalyReasons"] = [a for a in ev["anomalyReasons"] if a != "未分配直播间"]
+        if ev["title"] and "未填直播主题" in ev["anomalyReasons"]:
+            ev["anomalyReasons"] = [a for a in ev["anomalyReasons"] if a != "未填直播主题"]
         ev["hasAnomaly"] = bool(ev["anomalyReasons"]) or bool(ev["isConflict"])
 
-    # 3. Backfill missing sessions (>= supplement_start_date, e.g. Nov 2026 & Jan 2027)
+    # 3. Backfill missing sessions (>= supplement_start_date) WITH strict duplicate guard
     backfilled: List[Dict[str, Any]] = []
+    all_known_by_date: Dict[str, List[Dict[str, Any]]] = {}
+    for ev in events:
+        if ev.get("date"):
+            all_known_by_date.setdefault(ev["date"], []).append(ev)
+
     if supplement_start_date:
         # First backfill from unmatched weekly grid rows, merging matching unmatched pro rows into them
         for g_idx, g in enumerate(grid_rows):
@@ -1195,7 +1275,6 @@ def merge_supplements(
                 continue
             if not g["date"] or g["date"] < supplement_start_date:
                 continue
-            # Skip empty templates, stray notes, or attribute fragments lacking a concrete session (time OR speaker+title)
             hint = (g["titleHint"] or "").strip()
             if not g["start"]:
                 if not (g["speaker"] and hint and hint != g["category"]):
@@ -1203,6 +1282,16 @@ def merge_supplements(
             if not any([g["start"], g["speaker"], hint]):
                 continue
             new_ev = _build_event_from_grid(g, g_idx)
+
+            # Anti-duplicate guard against BOTH main-table events AND already-backfilled events
+            dup_target = _is_duplicate_of_existing(new_ev, all_known_by_date.get(new_ev["date"], []))
+            if dup_target is not None:
+                _apply_grid_to_event(dup_target, g)
+                if dup_target["room"] and "未分配直播间" in dup_target["anomalyReasons"]:
+                    dup_target["anomalyReasons"] = [a for a in dup_target["anomalyReasons"] if a != "未分配直播间"]
+                if dup_target["title"] and "未填直播主题" in dup_target["anomalyReasons"]:
+                    dup_target["anomalyReasons"] = [a for a in dup_target["anomalyReasons"] if a != "未填直播主题"]
+                continue
 
             # Try enriching this backfilled grid event with an unmatched pro_row
             best_p_idx = None
@@ -1214,14 +1303,15 @@ def merge_supplements(
                 t_score = _times_compatible(new_ev["start"], new_ev["end"], cand["start"], cand["end"])
                 if t_score < 0:
                     continue
-                if new_ev["speaker"] and cand["speaker"] and new_ev["speaker"] not in cand["speaker"] and cand["speaker"] not in new_ev["speaker"]:
+                same_spk = _same_speaker(new_ev["speaker"], cand["speaker"])
+                if new_ev["speaker"] and cand["speaker"] and not same_spk:
                     continue
                 cat_score = _category_compatible(new_ev["type"], new_ev["displayTitle"], cand["category"], cand["coursePrice"])
-                if cat_score < 0:
+                if cat_score < 0 and not same_spk:
                     continue
                 kw_score = _keyword_overlap_score(new_ev["displayTitle"], cand["coursePrice"] + " " + cand["speaker"])
-                spk_bonus = 40 if (new_ev["speaker"] and cand["speaker"] and (new_ev["speaker"] in cand["speaker"] or cand["speaker"] in new_ev["speaker"])) else 0
-                score = t_score + cat_score + kw_score + spk_bonus
+                spk_bonus = 60 if same_spk else 0
+                score = t_score + max(cat_score, 0) + kw_score + spk_bonus
                 if score >= 50 and score > best_p_score:
                     best_p_score = score
                     best_p = cand
@@ -1232,14 +1322,21 @@ def merge_supplements(
                 _apply_pro_to_event(new_ev, best_p)
 
             backfilled.append(new_ev)
+            all_known_by_date.setdefault(new_ev["date"], []).append(new_ev)
 
-        # Next backfill any remaining unmatched pro_rows >= supplement_start_date
+        # Next backfill any remaining unmatched pro_rows >= supplement_start_date (with duplicate guard)
         for p_idx, p in enumerate(pro_rows):
             if p_idx in used_pro_indices:
                 continue
             if not p["date"] or p["date"] < supplement_start_date:
                 continue
-            backfilled.append(_build_event_from_pro(p, p_idx))
+            new_ev = _build_event_from_pro(p, p_idx)
+            dup_target = _is_duplicate_of_existing(new_ev, all_known_by_date.get(new_ev["date"], []))
+            if dup_target is not None:
+                _apply_pro_to_event(dup_target, p)
+                continue
+            backfilled.append(new_ev)
+            all_known_by_date.setdefault(new_ev["date"], []).append(new_ev)
 
     if backfilled:
         events.extend(backfilled)
