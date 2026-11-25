@@ -754,11 +754,11 @@ def _parse_grid_session_block(block: str, date_str: str, category: str) -> Dict[
     room = _normalize_room_name(block)
 
     broadcast_mode = ""
-    m_mode = re.search(r"(?:【?开播方式】?|【?平台】?)\s*[:：]?\s*([^\n\r]+)", block)
+    m_mode = re.search(r"(?:【(?:开播方式|平台)】|(?:开播方式|平台)\s*[:：])\s*([^\n\r]+)", block)
     if m_mode:
-        bm = m_mode.group(1).strip()
-        bm = re.sub(r"[（(]\s*(?:19楼|21楼)[^）)]*[）)]", "", bm).strip(" ：:")
-        if not bm.startswith("【"):
+        bm = m_mode.group(1).strip().strip('"\'“” ')
+        bm = re.sub(r"[（(]\s*(?:19楼|21楼)[^）)]*[）)]", "", bm).strip(' ：:"\'“”')
+        if bm and not bm.startswith("【"):
             broadcast_mode = bm
 
     title_hint = ""
@@ -779,7 +779,7 @@ def _parse_grid_session_block(block: str, date_str: str, category: str) -> Dict[
                 title_hint = ln_s
                 break
 
-    note_clean = " | ".join([ln.strip() for ln in block.splitlines() if ln.strip()])
+    note_clean = " | ".join([ln.strip().strip('"\'') for ln in block.splitlines() if ln.strip()])
     if len(note_clean) > 360:
         note_clean = note_clean[:357] + "..."
 
@@ -1340,45 +1340,10 @@ def merge_supplements(
 
     if backfilled:
         events.extend(backfilled)
-        # Re-check room/videoAccount/host overlaps on dates that have backfilled sessions with explicit times
-        def _recheck(field_name: str, label: str) -> None:
-            buckets: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
-            for ev in events:
-                val = ev[field_name]
-                if not ev["date"] or not val or not ev["start"]:
-                    continue
-                norm_val = val.replace("(旧)", "")
-                buckets.setdefault((ev["date"], norm_val), []).append(ev)
-            for group in buckets.values():
-                if len(group) < 2:
-                    continue
-                for i in range(len(group)):
-                    for j in range(i + 1, len(group)):
-                        a, b = group[i], group[j]
-                        if a.get("origin") != "supplement" and b.get("origin") != "supplement":
-                            continue
-                        a_s, a_e = time_to_mins(a["start"]), time_to_mins(a["end"])
-                        b_s, b_e = time_to_mins(b["start"]), time_to_mins(b["end"])
-                        if a_s is None or b_s is None:
-                            continue
-                        a_end_m = a_e if (a_e is not None and a_e > a_s) else a_s + 60
-                        b_end_m = b_e if (b_e is not None and b_e > b_s) else b_s + 60
-                        if a_s < b_end_m and b_s < a_end_m:
-                            msg_a = f"与【{b['displayTitle']}】({b['start']}-{b['end']}) 时段重叠（相同{label}：{a[field_name]}）"
-                            msg_b = f"与【{a['displayTitle']}】({a['start']}-{a['end']}) 时段重叠（相同{label}：{b[field_name]}）"
-                            if not any(b["displayTitle"] in r and label in r for r in a["conflictReasons"]):
-                                a["conflictReasons"].append(msg_a)
-                            if not any(a["displayTitle"] in r and label in r for r in b["conflictReasons"]):
-                                b["conflictReasons"].append(msg_b)
 
-        _recheck("room", "直播间")
-        _recheck("videoAccount", "视频号账号")
-        _recheck("host", "主持人")
-        for ev in events:
-            ev["isConflict"] = bool(ev["conflictReasons"])
-            ev["hasAnomaly"] = bool(ev["anomalyReasons"]) or ev["isConflict"]
-
-        events.sort(key=lambda e: (e["date"] or "9999-99-99", e["start"] or "99:99", e["room"], e["displayTitle"]))
+    # Always recompute genuine conflicts cleanly AFTER enrichment & backfill
+    recompute_conflicts(events)
+    events.sort(key=lambda e: (e["date"] or "9999-99-99", e["start"] or "99:99", e["room"], e["displayTitle"]))
 
     return enriched_from_pro, enriched_from_grid, len(backfilled)
 
@@ -1626,9 +1591,9 @@ def build_events(raw_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if start and end and start == end:
             anomalies.append("开始与结束时间相同")
 
+        # Always compute real conflicts dynamically from actual schedule events
+        # (never copy stale DingTalk 冲突标记 text that can make an event conflict with itself).
         conflicts: List[str] = []
-        if conflict_flag == "冲突":
-            conflicts.append(conflict_reason or "原表格标记冲突")
 
         events.append(
             {
@@ -1648,20 +1613,28 @@ def build_events(raw_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 "ops": ops,
                 "room": room,
                 "detail": detail,
-                "tableConflict": conflict_flag == "冲突",
+                "tableConflict": False,
                 "conflictReasons": conflicts,
                 "anomalyReasons": anomalies,
             }
         )
 
-    # Dynamic conflict detection: same date + overlapping [start, end) on same room or same videoAccount
+    recompute_conflicts(events)
+    events.sort(key=lambda e: (e["date"] or "9999-99-99", e["start"] or "99:99", e["room"], e["displayTitle"]))
+    return events
+
+
+def recompute_conflicts(events: List[Dict[str, Any]]) -> None:
+    """Compute genuine overlapping conflicts across all distinct events (room / videoAccount / host)."""
+    for ev in events:
+        ev["conflictReasons"] = []
+
     def check_overlap(field_name: str, label: str) -> None:
         buckets: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
         for ev in events:
-            val = ev[field_name]
-            if not ev["date"] or not val:
+            val = (ev.get(field_name) or "").strip()
+            if not ev.get("date") or not val or not ev.get("start"):
                 continue
-            # Ignore legacy tag suffix when checking actual account collision
             norm_val = val.replace("(旧)", "")
             buckets.setdefault((ev["date"], norm_val), []).append(ev)
 
@@ -1671,6 +1644,8 @@ def build_events(raw_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             for i in range(len(group)):
                 for j in range(i + 1, len(group)):
                     a, b = group[i], group[j]
+                    if a["id"] == b["id"]:
+                        continue
                     a_s, a_e = time_to_mins(a["start"]), time_to_mins(a["end"])
                     b_s, b_e = time_to_mins(b["start"]), time_to_mins(b["end"])
                     if a_s is None or b_s is None:
@@ -1692,9 +1667,6 @@ def build_events(raw_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     for ev in events:
         ev["isConflict"] = bool(ev["conflictReasons"])
         ev["hasAnomaly"] = bool(ev["anomalyReasons"]) or ev["isConflict"]
-
-    events.sort(key=lambda e: (e["date"] or "9999-99-99", e["start"] or "99:99", e["room"], e["displayTitle"]))
-    return events
 
 
 def escape_ics(text: str) -> str:
@@ -1802,9 +1774,19 @@ def generate_ics(events: List[Dict[str, Any]], cal_name: str = "直播排期日�
     return "\r\n".join(lines) + "\r\n"
 
 
-def compute_content_hash(events: List[Dict[str, Any]], source_mode: str, source_url: str) -> str:
+def compute_content_hash(
+    events: List[Dict[str, Any]],
+    source_mode: str,
+    source_url: str,
+    has_live_trigger: bool = False,
+) -> str:
     canonical = json.dumps(
-        {"sourceMode": source_mode, "sourceUrl": source_url, "events": events},
+        {
+            "sourceMode": source_mode,
+            "sourceUrl": source_url,
+            "hasLiveTrigger": has_live_trigger,
+            "events": events,
+        },
         ensure_ascii=False,
         sort_keys=True,
     )
@@ -1835,6 +1817,7 @@ def write_outputs(
     source_url: str,
     password: str = "",
     force: bool = False,
+    live_sync_config: Optional[Dict[str, str]] = None,
 ) -> bool:
     """Write encrypted or plaintext calendar data. Returns True if files were updated."""
     data_dir = out_dir / "data"
@@ -1844,7 +1827,8 @@ def write_outputs(
     enc_path = data_dir / "schedule.enc.json"
     ics_path = out_dir / "calendar.ics"
 
-    content_hash = compute_content_hash(events, source_mode, source_url)
+    has_live_trigger = bool(live_sync_config and live_sync_config.get("token"))
+    content_hash = compute_content_hash(events, source_mode, source_url, has_live_trigger=has_live_trigger)
 
     if password:
         # Remove any leftover plaintext artifacts so secrets never leak to public Pages
@@ -1863,7 +1847,7 @@ def write_outputs(
                 pass
 
         synced_at = dt.datetime.now(SHANGHAI_TZ).strftime("%Y-%m-%d %H:%M:%S")
-        payload = {
+        payload: Dict[str, Any] = {
             "meta": {
                 "syncedAt": synced_at,
                 "timezone": "Asia/Shanghai",
@@ -1877,6 +1861,10 @@ def write_outputs(
             },
             "events": events,
         }
+        # Only embed live-trigger token INSIDE the AES-256-GCM encrypted payload (never in plaintext!)
+        if has_live_trigger and live_sync_config:
+            payload["liveSync"] = live_sync_config
+
         plain_json = json.dumps(payload, ensure_ascii=False)
         encrypted_json = run_crypto_helper("encrypt", plain_json, password)
         enc_path.write_text(encrypted_json, encoding="utf-8")
@@ -1994,6 +1982,14 @@ def main() -> int:
         )
         if n_pro > 0 or n_grid > 0 or n_added > 0:
             source_mode = "dingtalk-3table"
+    gh_trigger_token = os.getenv("GH_TRIGGER_TOKEN", "").strip()
+    gh_repo = os.getenv("GITHUB_REPOSITORY", "yangziyuan907-rgb/livestream-calendar").strip()
+    live_sync_cfg = (
+        {"repo": gh_repo, "workflow": "sync-calendar.yml", "ref": "main", "token": gh_trigger_token}
+        if gh_trigger_token
+        else None
+    )
+
     changed = write_outputs(
         events,
         out_dir,
@@ -2001,6 +1997,7 @@ def main() -> int:
         source_url=source_url,
         password=password,
         force=args.force,
+        live_sync_config=live_sync_cfg,
     )
 
     conflicts = sum(1 for e in events if e["isConflict"])
