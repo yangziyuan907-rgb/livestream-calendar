@@ -1,6 +1,8 @@
 (() => {
   "use strict";
 
+  const PASS_STORAGE_KEY = "livestream_cal_pass_v1";
+
   const TYPE_COLOR_MAP = {
     "专业课": 0,
     "朝阳计划": 1,
@@ -20,6 +22,8 @@
   const WEEKDAYS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 
   const state = {
+    encryptedEnvelope: null,
+    isEncryptedMode: false,
     meta: {},
     events: [],
     view: "month",
@@ -69,7 +73,84 @@
     showToast._timer = setTimeout(() => el.classList.remove("show"), 2600);
   }
 
-  // Theme management
+  // ---- Web Crypto AES-256-GCM Decryption ----
+  function b64ToBytes(b64) {
+    const bin = atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return arr;
+  }
+
+  async function decryptEnvelope(envelope, password) {
+    if (!window.crypto || !window.crypto.subtle) {
+      throw new Error("当前环境不支持 Web Crypto 解密，请通过 HTTPS 网址或 localhost 访问");
+    }
+    const enc = new TextEncoder();
+    const salt = b64ToBytes(envelope.salt);
+    const iv = b64ToBytes(envelope.iv);
+    const combined = b64ToBytes(envelope.ciphertext);
+    const baseKey = await window.crypto.subtle.importKey(
+      "raw",
+      enc.encode(password),
+      "PBKDF2",
+      false,
+      ["deriveKey"]
+    );
+    const aesKey = await window.crypto.subtle.deriveKey(
+      {
+        name: "PBKDF2",
+        salt,
+        iterations: Number(envelope.iterations) || 200000,
+        hash: "SHA-256",
+      },
+      baseKey,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["decrypt"]
+    );
+    const plainBuf = await window.crypto.subtle.decrypt({ name: "AES-GCM", iv }, aesKey, combined);
+    if (envelope.compressed === "gzip") {
+      if (typeof DecompressionStream !== "function") {
+        throw new Error("当前浏览器版本过旧，不支持 gzip 解压，请升级浏览器");
+      }
+      const stream = new Blob([plainBuf]).stream().pipeThrough(new DecompressionStream("gzip"));
+      const text = await new Response(stream).text();
+      return JSON.parse(text);
+    }
+    return JSON.parse(new TextDecoder().decode(plainBuf));
+  }
+
+  function showLockScreen(errorMsg = "") {
+    document.getElementById("appShell").classList.add("hidden");
+    document.getElementById("lockScreen").classList.remove("hidden");
+    const errEl = document.getElementById("lockError");
+    if (errorMsg) {
+      errEl.textContent = errorMsg;
+      errEl.classList.remove("hidden");
+    } else {
+      errEl.classList.add("hidden");
+    }
+    setTimeout(() => document.getElementById("passwordInput").focus(), 30);
+  }
+
+  function showAppWithData(data) {
+    state.meta = data.meta || {};
+    state.events = data.events || [];
+    document.getElementById("lockScreen").classList.add("hidden");
+    document.getElementById("appShell").classList.remove("hidden");
+
+    const encMode = Boolean(state.isEncryptedMode || state.meta.encrypted);
+    document.getElementById("encBadge").classList.toggle("hidden", !encMode);
+    document.getElementById("lockBtn").classList.toggle("hidden", !encMode);
+    document.getElementById("copyIcsUrlBtn").classList.toggle("hidden", encMode);
+
+    updateHeaderMeta();
+    populateFilterControls();
+    alignInitialPeriod(state.events);
+    render();
+  }
+
+  // ---- Theme ----
   function initTheme() {
     const saved = localStorage.getItem("calendar_theme");
     const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
@@ -86,7 +167,6 @@
     document.getElementById("themeBtn").textContent = theme === "dark" ? "浅色模式" : "深色模式";
   }
 
-  // Pick initial focus month smartly (current month if has events, else first scheduled month)
   function alignInitialPeriod(events) {
     const now = new Date();
     const curPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -115,7 +195,6 @@
     fillSelect("typeFilter", "全部直播类型", types, false);
     fillSelect("opsFilter", "全部运营", opsList, true, "未填运营");
 
-    // Quick month jump pills
     const months = [...new Set(state.events.map((e) => (e.date || "").slice(0, 7)).filter((m) => /^\d{4}-\d{2}$/.test(m)))].sort();
     const quickEl = document.getElementById("quickMonths");
     quickEl.innerHTML = months
@@ -139,7 +218,6 @@
       });
     });
 
-    // Legend
     document.getElementById("legendBar").innerHTML =
       `<strong style="color:var(--text);">图例：</strong>` +
       types
@@ -163,16 +241,21 @@
   function updateHeaderMeta() {
     const modeMap = {
       "dingtalk-api": "钉钉 API 自动同步",
-      "csv-fallback": "CSV 预置数据",
-      "csv-manual": "CSV 手动导入",
+      "csv-fallback": "排期快照",
+      "csv-manual": "CSV 加密同步",
       "browser-csv": "本地 CSV 预演",
     };
     const badge = document.getElementById("syncBadge");
     badge.textContent = `${modeMap[state.meta.sourceMode] || "已就绪"} · ${state.events.length} 场`;
     badge.className = `pill ${state.meta.sourceMode === "dingtalk-api" ? "success" : "warning"}`;
     document.getElementById("syncTimeBadge").textContent = `上次同步：${state.meta.syncedAt || "--"}`;
+
+    const srcLink = document.getElementById("sourceLink");
     if (state.meta.sourceUrl) {
-      document.getElementById("sourceLink").href = state.meta.sourceUrl;
+      srcLink.href = state.meta.sourceUrl;
+      srcLink.classList.remove("hidden");
+    } else {
+      srcLink.classList.add("hidden");
     }
   }
 
@@ -324,7 +407,6 @@
       { key: "21楼·就事论事", name: "21楼·就事论事", sub: "与19楼并行开播" },
       { key: "21楼·赏心悦室", name: "21楼·赏心悦室", sub: "与19楼并行开播" },
     ];
-    // Include any new studio names dynamically added in DingTalk later
     const extraRooms = [...new Set(filtered.map((e) => e.room).filter((r) => r && !knownStudios.some((s) => s.key === r)))];
     for (const r of extraRooms) knownStudios.push({ key: r, name: r, sub: "直播间" });
     knownStudios.push({ key: "", name: "未分配直播间", sub: "需补充房间字段" });
@@ -489,7 +571,83 @@
     document.getElementById("modalBackdrop").classList.remove("open");
   }
 
-  // Client-side CSV preview import (same rules as Python script)
+  // ---- Dynamic In-Browser ICS Export (no public plaintext calendar.ics needed) ----
+  function timeToMins(t) {
+    if (!t || !t.includes(":")) return null;
+    const [h, m] = t.split(":").map(Number);
+    return Number.isNaN(h) ? null : h * 60 + (m || 0);
+  }
+
+  function escapeIcs(s) {
+    return String(s || "").replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+  }
+
+  function downloadFilteredIcs() {
+    const list = getFilteredEvents().filter((e) => /^\d{4}-\d{2}-\d{2}$/.test(e.date));
+    const nowUtc = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
+    const lines = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//DingTalk Livestream Calendar//Encrypted Export//CN",
+      "CALSCALE:GREGORIAN",
+      "X-WR-CALNAME:直播排期日历",
+      "X-WR-TIMEZONE:Asia/Shanghai",
+      "BEGIN:VTIMEZONE",
+      "TZID:Asia/Shanghai",
+      "BEGIN:STANDARD",
+      "DTSTART:19700101T000000",
+      "TZOFFSETFROM:+0800",
+      "TZOFFSETTO:+0800",
+      "TZNAME:CST",
+      "END:STANDARD",
+      "END:VTIMEZONE",
+    ];
+    for (const e of list) {
+      const dStr = e.date.replace(/-/g, "");
+      const startHm = e.start || "09:00";
+      let endHm = e.end || startHm;
+      const sMins = timeToMins(startHm) ?? 540;
+      let eMins = timeToMins(endHm);
+      if (eMins == null || eMins <= sMins) {
+        eMins = Math.min(sMins + 60, 23 * 60 + 59);
+        endHm = `${String(Math.floor(eMins / 60)).padStart(2, "0")}:${String(eMins % 60).padStart(2, "0")}`;
+      }
+      const roomTag = ROOM_SHORT[e.room] || e.room || "待定";
+      const summary = `${e.isConflict ? "[冲突] " : ""}[${roomTag}] ${e.displayTitle}`;
+      const accounts = [e.videoAccount ? `视频号:${e.videoAccount}` : "", e.appAccount ? `APP:${e.appAccount}` : ""].filter(Boolean).join(" / ");
+      const desc = [
+        `直播类型：${e.type || "未分类"}`,
+        `直播间：${e.room || "未分配"}`,
+        `讲师：${e.speaker || "待定"} | 主持人：${e.host || "待定"} | 运营：${e.ops || "待定"}`,
+        `邀约状态：${e.inviteStatus || "未填写"}`,
+        `账号：${accounts || "待定"}`,
+        ...(e.conflictReasons?.length ? [`冲突：${e.conflictReasons.join("；")}`] : []),
+      ].join("\n");
+
+      lines.push(
+        "BEGIN:VEVENT",
+        `UID:dingtalk-live-${e.id}@schedule`,
+        `DTSTAMP:${nowUtc}`,
+        `DTSTART;TZID=Asia/Shanghai:${dStr}T${startHm.replace(":", "")}00`,
+        `DTEND;TZID=Asia/Shanghai:${dStr}T${endHm.replace(":", "")}00`,
+        `SUMMARY:${escapeIcs(summary)}`,
+        `LOCATION:${escapeIcs(e.room || "待定")}`,
+        `DESCRIPTION:${escapeIcs(desc)}`,
+        "END:VEVENT"
+      );
+    }
+    lines.push("END:VCALENDAR");
+    const blob = new Blob([lines.join("\r\n") + "\r\n"], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "直播排期日历.ics";
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`已导出 ${list.length} 场排期到 直播排期日历.ics`);
+  }
+
+  // ---- Client-side CSV preview import ----
   function parseCSV(text) {
     const rows = [];
     let row = [], cell = "", inQuotes = false;
@@ -512,12 +670,6 @@
     }
     if (cell.length || row.length) { row.push(cell); rows.push(row); }
     return rows;
-  }
-
-  function timeToMins(t) {
-    if (!t || !t.includes(":")) return null;
-    const [h, m] = t.split(":").map(Number);
-    return Number.isNaN(h) ? null : h * 60 + (m || 0);
   }
 
   function previewLocalCSV(text) {
@@ -573,7 +725,6 @@
       });
     }
 
-    // Overlap check on room
     const byDateRoom = {};
     for (const e of parsed) {
       if (!e.date || !e.room) continue;
@@ -592,8 +743,8 @@
             a.isConflict = b.isConflict = a.hasAnomaly = b.hasAnomaly = true;
             const msgA = `与【${b.displayTitle}】(${b.start}-${b.end}) 同直播间时段重叠`;
             const msgB = `与【${a.displayTitle}】(${a.start}-${a.end}) 同直播间时段重叠`;
-            if (!a.conflictReasons.includes(msgA)) a.conflictReasons.push(msgA);
-            if (!b.conflictReasons.includes(msgB)) b.conflictReasons.push(msgB);
+            if (!a.conflictReasons.some((r) => r.includes(b.displayTitle))) a.conflictReasons.push(msgA);
+            if (!b.conflictReasons.some((r) => r.includes(a.displayTitle))) b.conflictReasons.push(msgB);
           }
         }
       }
@@ -610,6 +761,52 @@
   }
 
   function bindEvents() {
+    // Unlock form
+    document.getElementById("togglePwBtn").addEventListener("click", () => {
+      const inp = document.getElementById("passwordInput");
+      const btn = document.getElementById("togglePwBtn");
+      const showing = inp.type === "text";
+      inp.type = showing ? "password" : "text";
+      btn.textContent = showing ? "显示" : "隐藏";
+    });
+
+    document.getElementById("unlockForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const pw = document.getElementById("passwordInput").value.trim();
+      const remember = document.getElementById("rememberPw").checked;
+      const btn = document.getElementById("unlockBtn");
+      const errEl = document.getElementById("lockError");
+      if (!pw || !state.encryptedEnvelope) return;
+
+      btn.disabled = true;
+      btn.textContent = "正在解密…";
+      errEl.classList.add("hidden");
+      try {
+        const data = await decryptEnvelope(state.encryptedEnvelope, pw);
+        if (remember) localStorage.setItem(PASS_STORAGE_KEY, pw);
+        else localStorage.removeItem(PASS_STORAGE_KEY);
+        document.getElementById("passwordInput").value = "";
+        showAppWithData(data);
+        showToast(remember ? "解锁成功，本机已记住密码（下次打开直接进入）" : "解锁成功");
+      } catch (err) {
+        errEl.textContent = err.message && err.message.includes("Web Crypto")
+          ? err.message
+          : "密码不正确，请检查后重试";
+        errEl.classList.remove("hidden");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "解锁查看";
+      }
+    });
+
+    document.getElementById("lockBtn").addEventListener("click", () => {
+      localStorage.removeItem(PASS_STORAGE_KEY);
+      state.events = [];
+      state.meta = {};
+      showLockScreen("");
+      showToast("已锁定并清除本机记住的密码");
+    });
+
     document.querySelectorAll(".seg-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         state.view = btn.dataset.view;
@@ -665,7 +862,6 @@
       render();
     });
 
-    // Delegated click to open event detail modal
     document.addEventListener("click", (e) => {
       const target = e.target.closest("[data-open-id]");
       if (target) openModal(target.getAttribute("data-open-id"));
@@ -677,11 +873,13 @@
     });
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
 
+    document.getElementById("downloadIcsBtn").addEventListener("click", downloadFilteredIcs);
+
     document.getElementById("copyIcsUrlBtn").addEventListener("click", async () => {
       const icsUrl = new URL("./calendar.ics", window.location.href).href;
       try {
         await navigator.clipboard.writeText(icsUrl);
-        showToast("已复制 .ics 日历订阅地址，可粘贴到 Apple/Google/钉钉日历");
+        showToast("已复制 .ics 日历订阅地址");
       } catch {
         prompt("请复制以下 .ics 订阅链接：", icsUrl);
       }
@@ -698,30 +896,49 @@
   }
 
   async function loadSchedule() {
-    let data = null;
-    if (window.location.protocol !== "file:") {
-      try {
-        const res = await fetch(`./data/schedule.json?t=${Date.now()}`, { cache: "no-store" });
-        if (res.ok) data = await res.json();
-      } catch {
-        // fallback below
+    // 1. Prefer AES-256-GCM encrypted payload (schedule.enc.json)
+    try {
+      const res = await fetch(`./data/schedule.enc.json?t=${Date.now()}`, { cache: "no-store" });
+      if (res.ok) {
+        const envelope = await res.json();
+        if (envelope && envelope.encrypted) {
+          state.encryptedEnvelope = envelope;
+          state.isEncryptedMode = true;
+
+          const savedPass = localStorage.getItem(PASS_STORAGE_KEY);
+          if (savedPass) {
+            try {
+              const data = await decryptEnvelope(envelope, savedPass);
+              showAppWithData(data);
+              return;
+            } catch {
+              localStorage.removeItem(PASS_STORAGE_KEY);
+              showLockScreen("团队访问密码已更新，请重新输入新密码");
+              return;
+            }
+          }
+          showLockScreen("");
+          return;
+        }
       }
-    }
-    if (!data && window.__SCHEDULE_DATA__) {
-      data = window.__SCHEDULE_DATA__;
-    }
-    if (!data) {
-      document.getElementById("calendarRoot").innerHTML =
-        `<div class="empty-state">未能加载排期数据，请先运行 <code>python3 scripts/sync_dingtalk.py</code> 或点击右上角导入 CSV。</div>`;
-      return;
+    } catch {
+      // fall through to plaintext check
     }
 
-    state.meta = data.meta || {};
-    state.events = data.events || [];
-    updateHeaderMeta();
-    populateFilterControls();
-    alignInitialPeriod(state.events);
-    render();
+    // 2. Fallback: plaintext schedule.json (for unencrypted local dev)
+    try {
+      const res = await fetch(`./data/schedule.json?t=${Date.now()}`, { cache: "no-store" });
+      if (res.ok) {
+        showAppWithData(await res.json());
+        return;
+      }
+    } catch {
+      // handled below
+    }
+
+    document.getElementById("appShell").classList.remove("hidden");
+    document.getElementById("calendarRoot").innerHTML =
+      `<div class="empty-state">未能加载排期数据。如在本地双击打开，请运行 <code>python3 -m http.server -d docs 8000</code> 后访问 <code>http://localhost:8000</code>。</div>`;
   }
 
   initTheme();
