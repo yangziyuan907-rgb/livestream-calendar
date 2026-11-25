@@ -1,0 +1,932 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//DingTalk Livestream Calendar//Auto Sync//CN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:直播排期日历
+X-WR-TIMEZONE:Asia/Shanghai
+REFRESH-INTERVAL;VALUE=DURATION:PT30M
+X-PUBLISHED-TTL:PT30M
+BEGIN:VTIMEZONE
+TZID:Asia/Shanghai
+BEGIN:STANDARD
+DTSTART:19700101T000000
+TZOFFSETFROM:+0800
+TZOFFSETTO:+0800
+TZNAME:CST
+END:STANDARD
+END:VTIMEZONE
+BEGIN:VEVENT
+UID:dingtalk-live-5cdc2f5cb3b4@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261201T150000
+DTEND;TZID=Asia/Shanghai:20261201T173000
+SUMMARY:[21F·就事] 初心咨询1《三个咨询片段》
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳计划\n直播间：21楼·就事论事\n
+ 讲师：待定 | 主持人：郭颖 | 运营：若欣\n老师邀约状态
+ ：未邀约\n开播账号：视频号:咨询师学堂
+CATEGORIES:朝阳计划
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-c849f2b236f6@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261201T180000
+DTEND;TZID=Asia/Shanghai:20261201T194000
+SUMMARY:[19F] 高价课短焦训练营（公开直播）-待定
+LOCATION:19楼
+DESCRIPTION:直播类型：专业课\n直播间：19楼\n讲师：付艳 | 
+ 主持人：陈琳 | 运营：余音\n老师邀约状态：未邀约\n开
+ 播账号：视频号:咨询师之家 / APP:咨询师之家APP
+CATEGORIES:专业课
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-7498b845df20@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261201T200000
+DTEND;TZID=Asia/Shanghai:20261201T213000
+SUMMARY:[19F] 【咨询观摩】
+LOCATION:19楼
+DESCRIPTION:直播类型：百场督导咨询观摩\n直播间：19楼\n讲
+ 师：待定 | 主持人：待定 | 运营：待定\n老师邀约状态：
+ 未邀约\n开播账号：待定
+CATEGORIES:百场督导咨询观摩
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-ef710c42c008@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261202T100000
+DTEND;TZID=Asia/Shanghai:20261202T120000
+SUMMARY:[19F] 专业课-CBT4.0 线索
+LOCATION:19楼
+DESCRIPTION:直播类型：专业课\n直播间：19楼\n讲师：张敬轩
+  | 主持人：小艺 | 运营：伶婷\n老师邀约状态：已邀约\n
+ 开播账号：视频号:咨询师之家 / APP:咨询师之家APP
+CATEGORIES:专业课
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-830b8b1185f3@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261202T150000
+DTEND;TZID=Asia/Shanghai:20261202T173000
+SUMMARY:[21F·就事] 壹心理视频号2《4大共情案例万能话术》
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳计划\n直播间：21楼·就事论事\n
+ 讲师：待定 | 主持人：郭颖 | 运营：志颖\n老师邀约状态
+ ：未填写\n开播账号：视频号:壹心理
+CATEGORIES:朝阳计划
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-4d0f96b5e35f@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261202T180000
+DTEND;TZID=Asia/Shanghai:20261202T194000
+SUMMARY:[19F] 高价课短焦训练营（公开直播）-已定
+LOCATION:19楼
+DESCRIPTION:直播类型：专业课\n直播间：19楼\n讲师：付艳 | 
+ 主持人：陈琳 | 运营：余音\n老师邀约状态：未邀约\n开
+ 播账号：视频号:咨询师之家 / APP:咨询师之家APP
+CATEGORIES:专业课
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-eecd8603f8c4@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261202T200000
+DTEND;TZID=Asia/Shanghai:20261202T213000
+SUMMARY:[19F] 【督导教学】
+LOCATION:19楼
+DESCRIPTION:直播类型：百场督导咨询观摩\n直播间：19楼\n讲
+ 师：待定 | 主持人：待定 | 运营：待定\n老师邀约状态：
+ 未邀约\n开播账号：待定
+CATEGORIES:百场督导咨询观摩
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-d54eeabbcc6d@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261203T100000
+DTEND;TZID=Asia/Shanghai:20261203T120000
+SUMMARY:[19F] 【平台产品】
+LOCATION:19楼
+DESCRIPTION:直播类型：平台产品\n直播间：19楼\n讲师：汤海
+ 鹏 | 主持人：小杨 | 运营：黄翱\n老师邀约状态：已邀约
+ \n开播账号：视频号:咨询师之家 / APP:咨询师之家APP
+CATEGORIES:平台产品
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-b81745561077@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261203T150000
+DTEND;TZID=Asia/Shanghai:20261203T170000
+SUMMARY:[冲突] [19F] （未命名 · 专业课）
+LOCATION:19楼
+DESCRIPTION:直播类型：专业课\n直播间：19楼\n讲师：付艳 | 
+ 主持人：陈琳 | 运营：余音\n老师邀约状态：已邀约\n开
+ 播账号：APP:咨询师之家APP\n冲突提醒：与【高价课短焦
+ 训练营（非公开直播）-已定】(15:00-17:00) 冲突，相同项
+ ：直播间\n数据提醒：未填直播主题
+CATEGORIES:专业课
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-ec0e2a67f8f5@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261203T150000
+DTEND;TZID=Asia/Shanghai:20261203T170000
+SUMMARY:[21F·就事] 朝阳自讲2《10.20许静-高手新手核心差异
+ 》
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳计划\n直播间：21楼·就事论事\n
+ 讲师：待定 | 主持人：柠檬 | 运营：若欣\n老师邀约状态
+ ：未填写\n开播账号：视频号:咨询师学堂
+CATEGORIES:朝阳计划
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-614644106bed@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261203T180000
+DTEND;TZID=Asia/Shanghai:20261203T200000
+SUMMARY:[19F] 高价课催眠线索（公开直播）-已定
+LOCATION:19楼
+DESCRIPTION:直播类型：专业课\n直播间：19楼\n讲师：洪伟凯
+  | 主持人：陈琳 | 运营：伶婷\n老师邀约状态：未邀约\n
+ 开播账号：视频号:咨询师之家 / APP:咨询师之家APP
+CATEGORIES:专业课
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-c8cf5363c4a7@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261204T150000
+DTEND;TZID=Asia/Shanghai:20261204T170000
+SUMMARY:[21F·就事] 朝阳自讲3《4大共情案例万能话术》
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳计划\n直播间：21楼·就事论事\n
+ 讲师：待定 | 主持人：郭颖 | 运营：若欣\n老师邀约状态
+ ：未填写\n开播账号：视频号:咨询师学堂
+CATEGORIES:朝阳计划
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-77fd3d939845@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261204T180000
+DTEND;TZID=Asia/Shanghai:20261204T200000
+SUMMARY:[冲突] [19F] 团督-【】-
+LOCATION:19楼
+DESCRIPTION:直播类型：团督\n直播间：19楼\n讲师：待定 | 主
+ 持人：待定 | 运营：待定\n老师邀约状态：未邀约\n开播
+ 账号：APP:咨询师之家APP\n冲突提醒：与【【平台产品】
+ 】(18:00-22:00) 冲突，相同项：直播间
+CATEGORIES:团督
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-4a7189aca75b@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261204T200000
+DTEND;TZID=Asia/Shanghai:20261204T213000
+SUMMARY:[21F·赏心] 督导教学闭门会
+LOCATION:21楼·赏心悦室
+DESCRIPTION:直播类型：百场督导咨询观摩\n直播间：21楼·赏
+ 心悦室\n讲师：待定 | 主持人：待定 | 运营：待定\n老师
+ 邀约状态：未邀约\n开播账号：APP:咨询师之家APP
+CATEGORIES:百场督导咨询观摩
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-abc9f6a2233d@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261207T100000
+DTEND;TZID=Asia/Shanghai:20261207T120000
+SUMMARY:[21F·就事] 朝阳公开课
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳计划\n直播间：21楼·就事论事\n
+ 讲师：待定 | 主持人：郭颖 | 运营：志颖\n老师邀约状态
+ ：未邀约\n开播账号：视频号:咨询师之家 / APP:咨询师之
+ 家APP
+CATEGORIES:朝阳计划
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-d5b2313746a3@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261207T180000
+DTEND;TZID=Asia/Shanghai:20261207T200000
+SUMMARY:[19F] 专业课汤海鹏中长程课程-已定
+LOCATION:19楼
+DESCRIPTION:直播类型：专业课\n直播间：19楼\n讲师：待定 | 
+ 主持人：待定 | 运营：待定\n老师邀约状态：未邀约\n开
+ 播账号：视频号:咨询师之家 / APP:咨询师之家APP
+CATEGORIES:专业课
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-f9ebd165496e@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261207T200000
+DTEND;TZID=Asia/Shanghai:20261207T213000
+SUMMARY:[19F] 【督导教学】
+LOCATION:19楼
+DESCRIPTION:直播类型：百场督导咨询观摩\n直播间：19楼\n讲
+ 师：待定 | 主持人：待定 | 运营：待定\n老师邀约状态：
+ 未邀约\n开播账号：待定
+CATEGORIES:百场督导咨询观摩
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-287fd0a7fd03@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261208T150000
+DTEND;TZID=Asia/Shanghai:20261208T173000
+SUMMARY:[21F·就事] 初心咨询2《总觉得自己不够好》
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳计划\n直播间：21楼·就事论事\n
+ 讲师：待定 | 主持人：柠檬 | 运营：若欣\n老师邀约状态
+ ：未邀约\n开播账号：视频号:咨询师学堂
+CATEGORIES:朝阳计划
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-2cc4a8f89eef@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261208T180000
+DTEND;TZID=Asia/Shanghai:20261208T193000
+SUMMARY:[19F] 专业课-CBT4.0 线索
+LOCATION:19楼
+DESCRIPTION:直播类型：专业课\n直播间：19楼\n讲师：张敬轩
+  | 主持人：小艺 | 运营：伶婷\n老师邀约状态：已邀约\n
+ 开播账号：视频号:咨询师之家 / APP:咨询师之家APP
+CATEGORIES:专业课
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-a7798a25687d@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261209T150000
+DTEND;TZID=Asia/Shanghai:20261209T173000
+SUMMARY:[21F·就事] 壹心理视频号2《4大共情案例万能话术》
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳计划\n直播间：21楼·就事论事\n
+ 讲师：待定 | 主持人：柠檬 | 运营：志颖\n老师邀约状态
+ ：未邀约\n开播账号：视频号:壹心理
+CATEGORIES:朝阳计划
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-85323f9fc1c0@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261209T180000
+DTEND;TZID=Asia/Shanghai:20261209T200000
+SUMMARY:[19F] 高价课催眠线索（公开直播）-已定
+LOCATION:19楼
+DESCRIPTION:直播类型：专业课\n直播间：19楼\n讲师：待定 | 
+ 主持人：待定 | 运营：待定\n老师邀约状态：未邀约\n开
+ 播账号：APP:咨询师之家APP
+CATEGORIES:专业课
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-eddacac7e858@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261209T200000
+DTEND;TZID=Asia/Shanghai:20261209T213000
+SUMMARY:[19F] 【咨询观摩】
+LOCATION:19楼
+DESCRIPTION:直播类型：百场督导咨询观摩\n直播间：19楼\n讲
+ 师：待定 | 主持人：待定 | 运营：待定\n老师邀约状态：
+ 未邀约\n开播账号：待定
+CATEGORIES:百场督导咨询观摩
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-3ad7d348650d@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261210T100000
+DTEND;TZID=Asia/Shanghai:20261210T120000
+SUMMARY:[19F] 专业课-CBT4.0 线索
+LOCATION:19楼
+DESCRIPTION:直播类型：专业课\n直播间：19楼\n讲师：待定 | 
+ 主持人：待定 | 运营：待定\n老师邀约状态：未邀约\n开
+ 播账号：APP:咨询师之家APP
+CATEGORIES:专业课
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-0b246ad59362@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261210T150000
+DTEND;TZID=Asia/Shanghai:20261210T173000
+SUMMARY:[待定] 朝阳自讲5《5.18那津瑞-4大共情案例回应话术
+ 示范》
+LOCATION:待定
+DESCRIPTION:直播类型：朝阳计划\n直播间：未分配\n讲师：
+ 待定 | 主持人：郭颖 | 运营：若欣\n老师邀约状态：未邀
+ 约\n开播账号：视频号:咨询师学堂\n数据提醒：未分配直
+ 播间
+CATEGORIES:朝阳计划
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-5e7fbb9865f9@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261210T180000
+DTEND;TZID=Asia/Shanghai:20261210T200000
+SUMMARY:[21F·赏心] 专业课儿童分析师-吉尔佳美班订金
+LOCATION:21楼·赏心悦室
+DESCRIPTION:直播类型：专业课\n直播间：21楼·赏心悦室\n讲
+ 师：待定 | 主持人：待定 | 运营：待定\n老师邀约状态：
+ 未邀约\n开播账号：APP:咨询师之家APP
+CATEGORIES:专业课
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-751d5f84b370@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261211T100000
+DTEND;TZID=Asia/Shanghai:20261211T120000
+SUMMARY:[19F] 咨询观摩- 伴侣治疗（待定）
+LOCATION:19楼
+DESCRIPTION:直播类型：百场督导咨询观摩\n直播间：19楼\n讲
+ 师：待定 | 主持人：待定 | 运营：待定\n老师邀约状态：
+ 未邀约\n开播账号：待定
+CATEGORIES:百场督导咨询观摩
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-2e371ebdff82@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261211T180000
+DTEND;TZID=Asia/Shanghai:20261211T220000
+SUMMARY:[冲突] [19F] 【平台产品】
+LOCATION:19楼
+DESCRIPTION:直播类型：平台产品\n直播间：19楼\n讲师：待定
+  | 主持人：待定 | 运营：待定\n老师邀约状态：未邀约\n
+ 开播账号：APP:咨询师之家APP\n冲突提醒：与【【平台产
+ 品】】(18:00-22:00) 冲突，相同项：直播间
+CATEGORIES:平台产品
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-e9f17c69d906@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261211T180000
+DTEND;TZID=Asia/Shanghai:20261211T190000
+SUMMARY:[21F·就事] 学员访谈
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳计划\n直播间：21楼·就事论事\n
+ 讲师：待定 | 主持人：柠檬 | 运营：志颖\n老师邀约状态
+ ：未填写\n开播账号：视频号:咨询师学堂\n数据提醒：开
+ 始与结束时间相同
+CATEGORIES:朝阳计划
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-e0ebac62c82c@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261214T100000
+DTEND;TZID=Asia/Shanghai:20261214T120000
+SUMMARY:[21F·就事] 朝阳公开课
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳计划\n直播间：21楼·就事论事\n
+ 讲师：待定 | 主持人：柠檬 | 运营：志颖\n老师邀约状态
+ ：未邀约\n开播账号：视频号:咨询师之家 / APP:咨询师之
+ 家APP
+CATEGORIES:朝阳计划
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-547fc73616f6@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261214T180000
+DTEND;TZID=Asia/Shanghai:20261214T200000
+SUMMARY:[19F] 专业课- 家庭治疗全年系统培训定金
+LOCATION:19楼
+DESCRIPTION:直播类型：专业课\n直播间：19楼\n讲师：汤海鹏
+  | 主持人：陈琳 | 运营：黄翱\n老师邀约状态：未邀约\n
+ 开播账号：视频号:咨询师之家 / APP:咨询师之家APP
+CATEGORIES:专业课
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-816e810fbf73@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261214T200000
+DTEND;TZID=Asia/Shanghai:20261214T213000
+SUMMARY:[19F] 【督导教学】
+LOCATION:19楼
+DESCRIPTION:直播类型：百场督导咨询观摩\n直播间：19楼\n讲
+ 师：待定 | 主持人：待定 | 运营：待定\n老师邀约状态：
+ 未邀约\n开播账号：待定
+CATEGORIES:百场督导咨询观摩
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-d39f1e1cadb6@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261215T150000
+DTEND;TZID=Asia/Shanghai:20261215T173000
+SUMMARY:[21F·就事] 初心咨询1《三个咨询片段》
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳计划\n直播间：21楼·就事论事\n
+ 讲师：待定 | 主持人：郭颖 | 运营：若欣\n老师邀约状态
+ ：未邀约\n开播账号：视频号:咨询师学堂
+CATEGORIES:朝阳计划
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-f6d2006f1da5@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261215T180000
+DTEND;TZID=Asia/Shanghai:20261215T200000
+SUMMARY:[冲突] [19F] 团督-【许静】-训练营-非公开-已定
+LOCATION:19楼
+DESCRIPTION:直播类型：团督\n直播间：19楼\n讲师：待定 | 主
+ 持人：待定 | 运营：待定\n老师邀约状态：未邀约\n开播
+ 账号：APP:咨询师之家APP\n冲突提醒：与【高价课CBT训练
+ 营（公开直播）-已定】(18:00-19:40) 冲突，相同项：直播
+ 间
+CATEGORIES:团督
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-0cbf71ebbd15@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261215T180000
+DTEND;TZID=Asia/Shanghai:20261215T194000
+SUMMARY:[冲突] [19F] 高价课CBT训练营（公开直播）-已定
+LOCATION:19楼
+DESCRIPTION:直播类型：专业课\n直播间：19楼\n讲师：待定 | 
+ 主持人：待定 | 运营：待定\n老师邀约状态：未邀约\n开
+ 播账号：APP:咨询师之家APP\n冲突提醒：与【团督-【许静
+ 】-训练营-非公开-已定】(18:00-20:00) 冲突，相同项：直播
+ 间
+CATEGORIES:专业课
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-6b619f137c2f@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261215T190000
+DTEND;TZID=Asia/Shanghai:20261215T210000
+SUMMARY:[21F·就事] 低转高训练营-有基础
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳训练营\n直播间：21楼·就事论事
+ \n讲师：待定 | 主持人：柠檬 | 运营：待定\n老师邀约状
+ 态：未邀约\n开播账号：视频号:咨询师之家(旧)
+CATEGORIES:朝阳训练营
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-eaf5702164ce@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261215T200000
+DTEND;TZID=Asia/Shanghai:20261215T213000
+SUMMARY:[19F] 【督导教学】
+LOCATION:19楼
+DESCRIPTION:直播类型：百场督导咨询观摩\n直播间：19楼\n讲
+ 师：待定 | 主持人：待定 | 运营：待定\n老师邀约状态：
+ 未邀约\n开播账号：待定
+CATEGORIES:百场督导咨询观摩
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-1b9391ed2f19@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261216T100000
+DTEND;TZID=Asia/Shanghai:20261216T120000
+SUMMARY:[19F] 高价课催眠线索（公开直播）-已定
+LOCATION:19楼
+DESCRIPTION:直播类型：专业课\n直播间：19楼\n讲师：待定 | 
+ 主持人：待定 | 运营：待定\n老师邀约状态：未邀约\n开
+ 播账号：APP:咨询师之家APP
+CATEGORIES:专业课
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-f5141ba35f2f@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261216T150000
+DTEND;TZID=Asia/Shanghai:20261216T173000
+SUMMARY:[21F·就事] 壹心理视频号2《4大共情案例万能话术》
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳计划\n直播间：21楼·就事论事\n
+ 讲师：待定 | 主持人：郭颖 | 运营：志颖\n老师邀约状态
+ ：未邀约\n开播账号：视频号:壹心理
+CATEGORIES:朝阳计划
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-06222b4330dc@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261216T180000
+DTEND;TZID=Asia/Shanghai:20261216T194000
+SUMMARY:[19F] 高价课CBT训练营（公开直播）-已定
+LOCATION:19楼
+DESCRIPTION:直播类型：专业课\n直播间：19楼\n讲师：待定 | 
+ 主持人：待定 | 运营：待定\n老师邀约状态：未邀约\n开
+ 播账号：APP:咨询师之家APP
+CATEGORIES:专业课
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-72de7c93b1c6@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261216T190000
+DTEND;TZID=Asia/Shanghai:20261216T210000
+SUMMARY:[21F·就事] 低转高训练营-有基础
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳训练营\n直播间：21楼·就事论事
+ \n讲师：待定 | 主持人：待定 | 运营：待定\n老师邀约状
+ 态：未邀约\n开播账号：视频号:咨询师之家
+CATEGORIES:朝阳训练营
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-d00ac53bec58@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261216T200000
+DTEND;TZID=Asia/Shanghai:20261216T213000
+SUMMARY:[19F] 【咨询观摩】
+LOCATION:19楼
+DESCRIPTION:直播类型：百场督导咨询观摩\n直播间：19楼\n讲
+ 师：待定 | 主持人：待定 | 运营：待定\n老师邀约状态：
+ 未邀约\n开播账号：待定
+CATEGORIES:百场督导咨询观摩
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-19c42075cd37@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261217T150000
+DTEND;TZID=Asia/Shanghai:20261217T170000
+SUMMARY:[19F] 高价课CBT训练营（非公开直播）-待定
+LOCATION:19楼
+DESCRIPTION:直播类型：专业课\n直播间：19楼\n讲师：待定 | 
+ 主持人：待定 | 运营：待定\n老师邀约状态：未邀约\n开
+ 播账号：APP:咨询师之家APP
+CATEGORIES:专业课
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-3fdbc42ceff7@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261217T150000
+DTEND;TZID=Asia/Shanghai:20261217T173000
+SUMMARY:[21F·就事] 朝阳自讲6《26.5.25刘梦雅-4大共情话术实
+ 战演练 》
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳计划\n直播间：21楼·就事论事\n
+ 讲师：待定 | 主持人：柠檬 | 运营：若欣\n老师邀约状态
+ ：未填写\n开播账号：视频号:咨询师学堂
+CATEGORIES:朝阳计划
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-321535c8a8b3@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261217T180000
+DTEND;TZID=Asia/Shanghai:20261217T194000
+SUMMARY:[19F] 【平台产品】
+LOCATION:19楼
+DESCRIPTION:直播类型：平台产品\n直播间：19楼\n讲师：待定
+  | 主持人：待定 | 运营：待定\n老师邀约状态：未邀约\n
+ 开播账号：APP:咨询师之家APP
+CATEGORIES:平台产品
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-05c9938ff00a@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261218T150000
+DTEND;TZID=Asia/Shanghai:20261218T170000
+SUMMARY:[21F·就事] 朝阳自讲7《4大共情案例万能话术》
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳计划\n直播间：21楼·就事论事\n
+ 讲师：待定 | 主持人：郭颖 | 运营：若欣\n老师邀约状态
+ ：未邀约\n开播账号：APP:咨询师之家APP
+CATEGORIES:朝阳计划
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-23af8f291226@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261218T180000
+DTEND;TZID=Asia/Shanghai:20261218T200000
+SUMMARY:[19F] 专业课张海音长程课
+LOCATION:19楼
+DESCRIPTION:直播类型：专业课\n直播间：19楼\n讲师：张海音
+  | 主持人：陈琳 | 运营：黄翱\n老师邀约状态：未邀约\n
+ 开播账号：APP:咨询师之家APP
+CATEGORIES:专业课
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-f7da4c0d6bee@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261221T100000
+DTEND;TZID=Asia/Shanghai:20261221T120000
+SUMMARY:[19F] 专业课- 家庭治疗
+LOCATION:19楼
+DESCRIPTION:直播类型：专业课\n直播间：19楼\n讲师：待定 | 
+ 主持人：待定 | 运营：待定\n老师邀约状态：未邀约\n开
+ 播账号：APP:咨询师之家APP
+CATEGORIES:专业课
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-c4ec440f3678@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261221T180000
+DTEND;TZID=Asia/Shanghai:20261221T220000
+SUMMARY:[19F] 【平台产品】
+LOCATION:19楼
+DESCRIPTION:直播类型：平台产品\n直播间：19楼\n讲师：待定
+  | 主持人：待定 | 运营：待定\n老师邀约状态：未邀约\n
+ 开播账号：APP:咨询师之家APP
+CATEGORIES:平台产品
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-ecfd46d8c099@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261221T180000
+DTEND;TZID=Asia/Shanghai:20261221T200000
+SUMMARY:[21F·就事] 朝阳公开课
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳计划\n直播间：21楼·就事论事\n
+ 讲师：待定 | 主持人：郭颖 | 运营：志颖\n老师邀约状态
+ ：未邀约\n开播账号：视频号:心理大咖说 / APP:咨询师之
+ 家APP
+CATEGORIES:朝阳计划
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-5ee737574338@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261222T150000
+DTEND;TZID=Asia/Shanghai:20261222T173000
+SUMMARY:[21F·就事] 初心咨询1《三个咨询片段》
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳计划\n直播间：21楼·就事论事\n
+ 讲师：待定 | 主持人：郭颖 | 运营：若欣\n老师邀约状态
+ ：未邀约\n开播账号：视频号:咨询师学堂
+CATEGORIES:朝阳计划
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-d91327109098@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261222T180000
+DTEND;TZID=Asia/Shanghai:20261222T194000
+SUMMARY:[19F] 高价课催眠训练营（公开直播）-已定
+LOCATION:19楼
+DESCRIPTION:直播类型：专业课\n直播间：19楼\n讲师：待定 | 
+ 主持人：待定 | 运营：待定\n老师邀约状态：未邀约\n开
+ 播账号：APP:咨询师之家APP
+CATEGORIES:专业课
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-1ad26d7890b6@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261222T190000
+DTEND;TZID=Asia/Shanghai:20261222T210000
+SUMMARY:[21F·就事] 低转高训练营-0基础
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳训练营\n直播间：21楼·就事论事
+ \n讲师：待定 | 主持人：待定 | 运营：待定\n老师邀约状
+ 态：未邀约\n开播账号：视频号:咨询师之家
+CATEGORIES:朝阳训练营
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-dbb369b8ac2b@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261222T200000
+DTEND;TZID=Asia/Shanghai:20261222T213000
+SUMMARY:[19F] 【督导教学】
+LOCATION:19楼
+DESCRIPTION:直播类型：百场督导咨询观摩\n直播间：19楼\n讲
+ 师：待定 | 主持人：待定 | 运营：待定\n老师邀约状态：
+ 未邀约\n开播账号：待定
+CATEGORIES:百场督导咨询观摩
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-f1aa4ea5e2f3@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261223T150000
+DTEND;TZID=Asia/Shanghai:20261223T173000
+SUMMARY:[21F·就事] 壹心理视频号2《4大共情案例万能话术》
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳计划\n直播间：21楼·就事论事\n
+ 讲师：待定 | 主持人：郭颖 | 运营：志颖\n老师邀约状态
+ ：未邀约\n开播账号：视频号:壹心理
+CATEGORIES:朝阳计划
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-d096c520eafd@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261223T180000
+DTEND;TZID=Asia/Shanghai:20261223T194000
+SUMMARY:[19F] 高价课催眠训练营（公开直播）-已定
+LOCATION:19楼
+DESCRIPTION:直播类型：专业课\n直播间：19楼\n讲师：待定 | 
+ 主持人：待定 | 运营：待定\n老师邀约状态：未邀约\n开
+ 播账号：APP:咨询师之家APP
+CATEGORIES:专业课
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-e6f54cd8eb0b@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261223T190000
+DTEND;TZID=Asia/Shanghai:20261223T210000
+SUMMARY:[21F·就事] 低转高训练营-0基础
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳训练营\n直播间：21楼·就事论事
+ \n讲师：待定 | 主持人：柠檬 | 运营：待定\n老师邀约状
+ 态：未填写\n开播账号：视频号:咨询师之家(旧)
+CATEGORIES:朝阳训练营
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-8d10ae8daee9@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261223T200000
+DTEND;TZID=Asia/Shanghai:20261223T213000
+SUMMARY:[19F] 团督-【许静】-已定
+LOCATION:19楼
+DESCRIPTION:直播类型：团督\n直播间：19楼\n讲师：待定 | 主
+ 持人：待定 | 运营：待定\n老师邀约状态：未邀约\n开播
+ 账号：APP:咨询师之家APP
+CATEGORIES:团督
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-8e8ee3a3fe68@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261224T150000
+DTEND;TZID=Asia/Shanghai:20261224T173000
+SUMMARY:[21F·就事] 朝阳自讲8《10.20许静-高手新手核心差异
+ 》
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳计划\n直播间：21楼·就事论事\n
+ 讲师：待定 | 主持人：柠檬 | 运营：若欣\n老师邀约状态
+ ：未填写\n开播账号：视频号:咨询师学堂
+CATEGORIES:朝阳计划
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-a2f255659a33@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261224T190000
+DTEND;TZID=Asia/Shanghai:20261224T210000
+SUMMARY:[21F·就事] 高价课催眠训练营（非公开直播）-已定
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：专业课\n直播间：21楼·就事论事\n讲
+ 师：待定 | 主持人：待定 | 运营：待定\n老师邀约状态：
+ 未邀约\n开播账号：APP:咨询师之家APP
+CATEGORIES:专业课
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-24da31000c20@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261224T200000
+DTEND;TZID=Asia/Shanghai:20261224T213000
+SUMMARY:[19F] 【咨询观摩】
+LOCATION:19楼
+DESCRIPTION:直播类型：百场督导咨询观摩\n直播间：19楼\n讲
+ 师：待定 | 主持人：待定 | 运营：待定\n老师邀约状态：
+ 未邀约\n开播账号：待定
+CATEGORIES:百场督导咨询观摩
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-c57629d1e606@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261228T100000
+DTEND;TZID=Asia/Shanghai:20261228T120000
+SUMMARY:[19F] 专业课- 家庭治疗
+LOCATION:19楼
+DESCRIPTION:直播类型：专业课\n直播间：19楼\n讲师：待定 | 
+ 主持人：待定 | 运营：待定\n老师邀约状态：未邀约\n开
+ 播账号：APP:咨询师之家APP
+CATEGORIES:专业课
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-035973cbf52e@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261228T150000
+DTEND;TZID=Asia/Shanghai:20261228T170000
+SUMMARY:[21F·就事] 朝阳自讲4《26.5.25刘梦雅-4大共情话术实
+ 战演练 》
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳计划\n直播间：21楼·就事论事\n
+ 讲师：待定 | 主持人：柠檬 | 运营：若欣\n老师邀约状态
+ ：未填写\n开播账号：视频号:咨询师学堂
+CATEGORIES:朝阳计划
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-f3c8dd236f7a@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261228T180000
+DTEND;TZID=Asia/Shanghai:20261228T220000
+SUMMARY:[冲突] [19F] （未命名 · 平台产品）
+LOCATION:19楼
+DESCRIPTION:直播类型：平台产品\n直播间：19楼\n讲师：待定
+  | 主持人：陈琳 | 运营：黄翱\n老师邀约状态：未填写\n
+ 开播账号：视频号:咨询师之家 / APP:咨询师之家APP\n冲突
+ 提醒：与【团督-【】-】(18:00-20:00) 冲突，相同项：直播
+ 间\n数据提醒：未填直播主题
+CATEGORIES:平台产品
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-4c0a67f0d187@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261228T200000
+DTEND;TZID=Asia/Shanghai:20261228T220000
+SUMMARY:[冲突] [19F] 团督-【】-
+LOCATION:19楼
+DESCRIPTION:直播类型：团督\n直播间：19楼\n讲师：待定 | 主
+ 持人：小杨 | 运营：待定\n老师邀约状态：未邀约\n开播
+ 账号：APP:咨询师之家APP\n冲突提醒：与【团督-【】-】(18
+ :00-20:00) 冲突，相同项：直播间；与【（未命名 · 平台
+ 产品）】(18:00-22:00) 时段重叠（相同直播间：19楼）
+CATEGORIES:团督
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-3dc592e93127@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261229T150000
+DTEND;TZID=Asia/Shanghai:20261229T173000
+SUMMARY:[21F·就事] 初心咨询1《三个咨询片段》
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳计划\n直播间：21楼·就事论事\n
+ 讲师：待定 | 主持人：郭颖 | 运营：若欣\n老师邀约状态
+ ：未邀约\n开播账号：视频号:咨询师学堂
+CATEGORIES:朝阳计划
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-35f823728cfd@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261229T180000
+DTEND;TZID=Asia/Shanghai:20261229T200000
+SUMMARY:[19F] 团督-【】-
+LOCATION:19楼
+DESCRIPTION:直播类型：团督\n直播间：19楼\n讲师：待定 | 主
+ 持人：待定 | 运营：待定\n老师邀约状态：未邀约\n开播
+ 账号：APP:咨询师之家APP
+CATEGORIES:团督
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-c1b5bb90bec4@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261229T190000
+DTEND;TZID=Asia/Shanghai:20261229T210000
+SUMMARY:[21F·就事] 朝阳答疑
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳计划\n直播间：21楼·就事论事\n
+ 讲师：待定 | 主持人：柠檬 | 运营：志颖\n老师邀约状态
+ ：未填写\n开播账号：视频号:咨询师学堂
+CATEGORIES:朝阳计划
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-e50925116262@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261229T200000
+DTEND;TZID=Asia/Shanghai:20261229T213000
+SUMMARY:[19F] 【督导教学】
+LOCATION:19楼
+DESCRIPTION:直播类型：百场督导咨询观摩\n直播间：19楼\n讲
+ 师：待定 | 主持人：待定 | 运营：待定\n老师邀约状态：
+ 未邀约\n开播账号：待定
+CATEGORIES:百场督导咨询观摩
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-7c703a35b4ec@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261230T150000
+DTEND;TZID=Asia/Shanghai:20261230T173000
+SUMMARY:[21F·就事] 壹心理视频号2《4大共情案例万能话术》
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳计划\n直播间：21楼·就事论事\n
+ 讲师：待定 | 主持人：郭颖 | 运营：志颖\n老师邀约状态
+ ：未邀约\n开播账号：视频号:壹心理
+CATEGORIES:朝阳计划
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-f28e9507486c@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261230T180000
+DTEND;TZID=Asia/Shanghai:20261230T193000
+SUMMARY:[19F] 【咨询伦理决策现场】
+LOCATION:19楼
+DESCRIPTION:直播类型：咨询伦理决策现场\n直播间：19楼\n讲
+ 师：待定 | 主持人：待定 | 运营：待定\n老师邀约状态：
+ 未邀约\n开播账号：待定
+CATEGORIES:咨询伦理决策现场
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-5cce6e060e41@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20261230T200000
+DTEND;TZID=Asia/Shanghai:20261230T213000
+SUMMARY:[19F] 【咨询观摩】
+LOCATION:19楼
+DESCRIPTION:直播类型：百场督导咨询观摩\n直播间：19楼\n讲
+ 师：待定 | 主持人：待定 | 运营：待定\n老师邀约状态：
+ 未邀约\n开播账号：待定
+CATEGORIES:百场督导咨询观摩
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-ec90c5dd986b@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20270111T180000
+DTEND;TZID=Asia/Shanghai:20270111T190000
+SUMMARY:[21F·就事] 朝阳公开课
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳计划\n直播间：21楼·就事论事\n
+ 讲师：待定 | 主持人：郭颖 | 运营：志颖\n老师邀约状态
+ ：未邀约\n开播账号：视频号:咨询师之家 / APP:咨询师之
+ 家APP\n数据提醒：开始与结束时间相同
+CATEGORIES:朝阳计划
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-0beae4024a01@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20270118T180000
+DTEND;TZID=Asia/Shanghai:20270118T200000
+SUMMARY:[21F·就事] 朝阳公开课
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳计划\n直播间：21楼·就事论事\n
+ 讲师：待定 | 主持人：柠檬 | 运营：志颖\n老师邀约状态
+ ：未邀约\n开播账号：视频号:咨询师之家 / APP:咨询师之
+ 家APP
+CATEGORIES:朝阳计划
+END:VEVENT
+BEGIN:VEVENT
+UID:dingtalk-live-fe9c882216c0@schedule
+DTSTAMP:20261125T033001Z
+DTSTART;TZID=Asia/Shanghai:20270125T180000
+DTEND;TZID=Asia/Shanghai:20270125T200000
+SUMMARY:[21F·就事] 朝阳公开课
+LOCATION:21楼·就事论事
+DESCRIPTION:直播类型：朝阳计划\n直播间：21楼·就事论事\n
+ 讲师：待定 | 主持人：郭颖 | 运营：志颖\n老师邀约状态
+ ：未邀约\n开播账号：视频号:咨询师之家 / APP:咨询师之
+ 家APP
+CATEGORIES:朝阳计划
+END:VEVENT
+END:VCALENDAR
