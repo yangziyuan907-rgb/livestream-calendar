@@ -662,32 +662,59 @@ def _resolve_week_dates(
 
 
 def _split_grid_cell_blocks(cell_text: str) -> List[str]:
-    """Split a weekly-grid cell that may stack multiple sessions into separate session blocks."""
+    """Split a weekly-grid cell that may stack multiple sessions WITHOUT breaking one session on blank lines."""
     lines = [ln.strip() for ln in cell_text.splitlines()]
     blocks: List[List[str]] = []
     cur: List[str] = []
+    saw_blank = False
+
     session_starter = re.compile(
         r"^(?:【(?:专业课|高价课|督导教学|咨询观摩|团督|平台产品|咨询伦理|朝阳)】|(?:\d+\s*[.、]\s*【))"
     )
-    time_header = re.compile(r"^【时间】")
+    continuation_attr = re.compile(
+        r"^(?:【(?:带货|平台|开播方式|人员|负责|场地|直播间|备注|推流|场控|主持人|主播|课程|目标|邀约|状态)】|"
+        r"(?:带货|平台|开播方式|人员|负责|场地|直播间|备注|推流|场控|主持人|主播)\s*[:：])"
+    )
+    time_header = re.compile(r"^【?时间】?\s*[:：]?")
+    speaker_header = re.compile(r"^【?(?:讲师|主讲|老师)】?\s*[:：]?")
+    title_header = re.compile(r"^【主题】")
+
     for ln in lines:
         if not ln:
             if cur:
-                blocks.append(cur)
-                cur = []
+                saw_blank = True
             continue
+
         if cur:
             cur_joined = "\n".join(cur)
-            has_time = bool(re.search(r"\d{1,2}:\d{2}", cur_joined))
-            if session_starter.match(ln) and len(cur) >= 2 and (has_time or "讲师" in cur_joined or "场地" in cur_joined or "平台" in cur_joined):
+            has_time = bool(re.search(r"\d{1,2}\s*[:：]\s*\d{2}", cur_joined))
+            has_speaker = bool(re.search(r"(?:【?讲师】?|主讲|老师)\s*[:：]?\s*\S+", cur_joined))
+            has_title = bool(re.search(r"【主题】\s*\S+", cur_joined))
+
+            should_split = False
+            if continuation_attr.match(ln):
+                should_split = False
+            elif time_header.match(ln):
+                should_split = has_time
+            elif speaker_header.match(ln):
+                should_split = has_speaker and (saw_blank or has_time)
+            elif title_header.match(ln):
+                should_split = (has_title or has_time) and saw_blank
+            elif session_starter.match(ln):
+                should_split = len(cur) >= 2 and (has_time or has_speaker or "场地" in cur_joined or "平台" in cur_joined)
+            elif saw_blank and has_time:
+                # Plain new title line after a blank line when the previous session already has a time
+                should_split = True
+
+            if should_split:
                 blocks.append(cur)
                 cur = [ln]
+                saw_blank = False
                 continue
-            if time_header.match(ln) and has_time:
-                blocks.append(cur)
-                cur = [ln]
-                continue
+
         cur.append(ln)
+        saw_blank = False
+
     if cur:
         blocks.append(cur)
     return ["\n".join(b) for b in blocks if b]
@@ -695,7 +722,7 @@ def _split_grid_cell_blocks(cell_text: str) -> List[str]:
 
 def _clean_person_token(raw: str) -> str:
     s = (raw or "").strip()
-    s = re.split(r"(?:场控|主持人|主播|推流|运营|场地|直播间|平台|开播方式|时间|【|（|\()", s)[0]
+    s = re.split(r"(?:场控|主持人|主播|推流|运营|场地|直播间|平台|开播方式|时间|带货|【|（|\()", s)[0]
     s = s.strip(" ：:、，,;-|/")
     return s
 
@@ -731,16 +758,24 @@ def _parse_grid_session_block(block: str, date_str: str, category: str) -> Dict[
     if m_mode:
         bm = m_mode.group(1).strip()
         bm = re.sub(r"[（(]\s*(?:19楼|21楼)[^）)]*[）)]", "", bm).strip(" ：:")
-        broadcast_mode = bm
+        if not bm.startswith("【"):
+            broadcast_mode = bm
 
     title_hint = ""
     m_title = re.search(r"【主题】\s*[:：]?\s*([^\n\r]+)", block)
     if m_title:
-        title_hint = m_title.group(1).strip()
-    else:
+        cand_t = m_title.group(1).strip()
+        if cand_t and not cand_t.startswith("【"):
+            title_hint = cand_t
+    if not title_hint:
+        attr_line = re.compile(
+            r"^(?:【(?:时间|讲师|主讲|老师|人员|负责|场地|直播间|开播方式|平台|带货|备注|主题|主持人|主播|场控|推流)】|"
+            r"(?:时间|讲师|主讲|老师|人员|负责|场地|直播间|开播方式|平台|带货|备注|主持人|主播|场控|推流)\s*[:：]|"
+            r"\d{1,2}\s*[:：]\s*\d{2})"
+        )
         for ln in block.splitlines():
             ln_s = ln.strip()
-            if ln_s and not re.match(r"^(?:【?(?:时间|讲师|人员|负责|场地|开播方式|平台)】?|\d{1,2}:\d{2})", ln_s):
+            if ln_s and not attr_line.match(ln_s):
                 title_hint = ln_s
                 break
 
@@ -1160,9 +1195,12 @@ def merge_supplements(
                 continue
             if not g["date"] or g["date"] < supplement_start_date:
                 continue
-            # Skip obvious non-session placeholder notes (e.g. "待定", "休息", "节假日", "无")
+            # Skip empty templates, stray notes, or attribute fragments lacking a concrete session (time OR speaker+title)
             hint = (g["titleHint"] or "").strip()
-            if not any([g["start"], g["speaker"], g["host"], g["room"], g["broadcastMode"]]) and len(hint) <= 4:
+            if not g["start"]:
+                if not (g["speaker"] and hint and hint != g["category"]):
+                    continue
+            if not any([g["start"], g["speaker"], hint]):
                 continue
             new_ev = _build_event_from_grid(g, g_idx)
 
