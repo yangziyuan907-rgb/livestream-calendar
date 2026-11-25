@@ -4,13 +4,13 @@
   const PASS_STORAGE_KEY = "livestream_cal_pass_v1";
 
   const TYPE_COLOR_MAP = {
-    "专业课": 0,
-    "朝阳计划": 1,
-    "百场督导咨询观摩": 2,
-    "平台产品": 3,
-    "团督": 4,
-    "朝阳训练营": 5,
-    "咨询伦理决策现场": 2,
+    "专业课": 0,           // 原表珊瑚粉红 #f2c2be
+    "朝阳计划": 1,         // 原表金黄色 #f4cd53
+    "百场督导咨询观摩": 2, // 原表蓝色 #c6dcff
+    "平台产品": 3,         // 原表灰豆浅绿 #dfe9d4
+    "团督": 4,             // 原表青柠浅黄绿 #ecf4bf
+    "朝阳训练营": 5,       // 原表浅紫 #e8dffb
+    "咨询伦理决策现场": 6, // 原表浅青绿 #d4ece6
   };
 
   const ROOM_SHORT = {
@@ -191,8 +191,16 @@
 
   function getTypeIdx(type) {
     if (type in TYPE_COLOR_MAP) return TYPE_COLOR_MAP[type];
+    const s = String(type || "");
+    if (s.includes("专业课") || s.includes("高价课")) return 0;
+    if (s.includes("朝阳训练营")) return 5;
+    if (s.includes("朝阳")) return 1;
+    if (s.includes("督导") || s.includes("观摩")) return 2;
+    if (s.includes("团督")) return 4;
+    if (s.includes("伦理")) return 6;
+    if (s.includes("平台")) return 3;
     let h = 0;
-    for (const ch of String(type || "其他")) h = (h * 31 + ch.charCodeAt(0)) % 6;
+    for (const ch of String(type || "其他")) h = (h * 31 + ch.charCodeAt(0)) % 7;
     return Math.abs(h);
   }
 
@@ -337,65 +345,12 @@
     fillSelect("typeFilter", "全部直播类型", types, false);
     fillSelect("opsFilter", "全部运营", opsList, true, "未填运营");
 
-    const months = [...new Set(state.events.map((e) => (e.date || "").slice(0, 7)).filter((m) => /^\d{4}-\d{2}$/.test(m)))].sort();
-    const quickEl = document.getElementById("quickMonths");
-    quickEl.className = "quick-months-wrap";
-
-    const jumpToYM = (ym) => {
-      if (!ym || !ym.includes("-")) return;
-      const [y, m] = ym.split("-").map(Number);
-      state.year = y;
-      state.month = m - 1;
-      const firstInMonth = state.events.find((e) => e.date && e.date.startsWith(ym));
-      if (firstInMonth) {
-        const [fy, fm, fd] = firstInMonth.date.split("-").map(Number);
-        state.weekStart = getMonday(new Date(fy, fm - 1, fd));
-      } else {
-        state.weekStart = getMonday(new Date(y, m - 1, 1));
-      }
-      render();
-    };
-
-    const primaryMonths = months.slice(0, 3);
-    const extraMonths = months.slice(3);
-    let quickHtml = primaryMonths
-      .map((ym) => {
-        const [y, m] = ym.split("-").map(Number);
-        return `<button type="button" class="btn btn-ghost quick-month-btn" data-ym="${ym}">${y}年${m}月</button>`;
-      })
-      .join("");
-    if (extraMonths.length) {
-      quickHtml +=
-        `<select id="moreMonthsSelect" class="select quick-month-select" aria-label="更多月份">` +
-        `<option value="">更多月份 (${extraMonths.length})</option>` +
-        extraMonths
-          .map((ym) => {
-            const [y, m] = ym.split("-").map(Number);
-            return `<option value="${ym}">${y}年${m}月</option>`;
-          })
-          .join("") +
-        `</select>`;
-    }
-    quickEl.innerHTML = quickHtml;
-    quickEl.querySelectorAll(".quick-month-btn").forEach((btn) => {
-      btn.addEventListener("click", () => jumpToYM(btn.dataset.ym));
-    });
-    const moreSel = document.getElementById("moreMonthsSelect");
-    if (moreSel) {
-      moreSel.addEventListener("change", (e) => {
-        if (e.target.value) {
-          jumpToYM(e.target.value);
-          e.target.value = "";
-        }
-      });
-    }
-
     document.getElementById("legendBar").innerHTML =
       `<strong style="color:var(--text);">图例：</strong>` +
       types
-        .map((t) => `<span class="legend-item"><span class="swatch" style="background:var(--cat-${getTypeIdx(t)});"></span>${escapeHtml(t)}</span>`)
+        .map((t) => `<span class="legend-item"><span class="swatch" style="background:var(--cat-${getTypeIdx(t)}-bg);border-color:var(--cat-${getTypeIdx(t)});"></span>${escapeHtml(t)}</span>`)
         .join("") +
-      `<span class="legend-item" style="color:var(--danger);font-weight:600;"><span class="swatch" style="background:var(--danger);"></span>时段冲突</span>` +
+      `<span class="legend-item" style="color:var(--danger);font-weight:600;"><span class="swatch" style="background:var(--danger);border-color:var(--danger);"></span>时段冲突</span>` +
       `<span class="legend-item"><span class="dot" style="background:var(--success);"></span>已邀约</span>` +
       `<span class="legend-item"><span class="dot" style="background:var(--warning);"></span>未邀约</span>`;
   }
@@ -528,12 +483,14 @@
     `;
   }
 
+  function parseYMD(str) {
+    const [y, m, d] = str.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }
+
   function renderMonth(filtered) {
-    document.getElementById("periodTitle").textContent = `${state.year}年 ${state.month + 1}月`;
-    const first = new Date(state.year, state.month, 1);
-    const offset = (first.getDay() + 6) % 7;
-    const gridStart = new Date(state.year, state.month, 1 - offset);
-    const todayKey = formatDateKey(new Date());
+    const today = new Date();
+    const todayKey = formatDateKey(today);
 
     const byDate = {};
     for (const e of filtered) {
@@ -541,23 +498,53 @@
       (byDate[e.date] ||= []).push(e);
     }
 
+    // Continuous unified multi-month grid: scroll straight down across all months seamlessly
+    const allDated = (filtered.length ? filtered : state.events)
+      .map((e) => e.date)
+      .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+      .sort();
+
+    let rangeStart = getMonday(new Date(today.getFullYear(), today.getMonth(), 1));
+    let rangeEnd = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+    if (allDated.length) {
+      const firstDate = parseYMD(allDated[0]);
+      const lastDate = parseYMD(allDated[allDated.length - 1]);
+      const minD = firstDate < today ? firstDate : today;
+      const maxD = lastDate > today ? lastDate : today;
+      // Start at the Monday of the first month's 1st day; end at Sunday covering the last month's last day
+      rangeStart = getMonday(new Date(minD.getFullYear(), minD.getMonth(), 1));
+      const lastDayOfEndMonth = new Date(maxD.getFullYear(), maxD.getMonth() + 1, 0);
+      const endOffset = (7 - ((lastDayOfEndMonth.getDay() + 6) % 7) - 1);
+      rangeEnd = new Date(lastDayOfEndMonth.getFullYear(), lastDayOfEndMonth.getMonth(), lastDayOfEndMonth.getDate() + endOffset);
+    }
+
     const cells = [];
-    for (let i = 0; i < 42; i++) {
-      const d = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
-      if (i === 35 && d.getMonth() !== state.month) break;
+    for (let d = new Date(rangeStart); d <= rangeEnd; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
       const key = formatDateKey(d);
-      const inMonth = d.getMonth() === state.month;
       const list = byDate[key] || [];
       const hasConflict = list.some((e) => e.isConflict);
       const isToday = key === todayKey;
+      const isFirst = d.getDate() === 1;
+      const isAltMonth = d.getMonth() % 2 === 1;
       const hInfo = getDateHolidayInfo(key);
       const holidayOffCls = hInfo.stat && hInfo.stat.kind === "off" ? "is-holiday-off" : "";
 
+      // Add crisp top border where a cell's month differs from the cell directly above it (7 days prior)
+      const weekAgo = new Date(d.getFullYear(), d.getMonth(), d.getDate() - 7);
+      const topBorderCls = d > rangeStart && weekAgo >= rangeStart && weekAgo.getMonth() !== d.getMonth()
+        ? "month-top-border"
+        : "";
+      const startBorderCls = isFirst && ((d.getDay() + 6) % 7) !== 0 ? "month-start-cell" : "";
+
+      const dateLabelHtml = isFirst
+        ? `<span class="month-first-pill">${d.getMonth() === 0 ? `${d.getFullYear()}年1月1日` : `${d.getMonth() + 1}月1日`}</span>`
+        : `<span class="day-num">${d.getDate()}</span>`;
+
       cells.push(`
-        <div class="day-cell ${inMonth ? "" : "outside"} ${isToday ? "today" : ""} ${holidayOffCls}" ${isToday ? 'data-is-today="true"' : ""}>
+        <div class="day-cell ${isAltMonth ? "month-alt" : ""} ${topBorderCls} ${startBorderCls} ${isToday ? "today" : ""} ${holidayOffCls}" ${isToday ? 'data-is-today="true"' : ""}>
           <div class="day-head">
             <div class="day-head-left">
-              <span class="day-num">${d.getDate() === 1 ? `${d.getMonth() + 1}月1日` : d.getDate()}</span>
+              ${dateLabelHtml}
               ${isToday ? `<span class="today-badge">今天</span>` : ""}
               ${renderHolidayBadges(key)}
             </div>
@@ -579,10 +566,9 @@
   }
 
   function renderWeek(filtered) {
-    const start = new Date(state.weekStart);
-    const days = Array.from({ length: 7 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
-    const end = days[6];
-    document.getElementById("periodTitle").textContent = `${start.getMonth() + 1}/${start.getDate()} – ${end.getMonth() + 1}/${end.getDate()}`;
+    const today = new Date();
+    const todayKey = formatDateKey(today);
+    const todayMondayKey = formatDateKey(getMonday(today));
 
     const knownStudios = [
       { key: "19楼", name: "19楼", sub: "主直播间（并行）" },
@@ -594,71 +580,90 @@
     knownStudios.push({ key: "", name: "未分配直播间", sub: "需补充房间字段" });
 
     const map = {};
+    const weekMondaySet = new Set();
     for (const e of filtered) {
-      if (!e.date) continue;
+      if (!e.date || !/^\d{4}-\d{2}-\d{2}$/.test(e.date)) continue;
       const k = `${e.room || ""}__${e.date}`;
       (map[k] ||= []).push(e);
+      weekMondaySet.add(formatDateKey(getMonday(parseYMD(e.date))));
+    }
+    if (!weekMondaySet.size) {
+      document.getElementById("calendarRoot").innerHTML = `<div class="empty-state">当前筛选条件下暂无排期记录</div>`;
+      return;
     }
 
-    const visibleStudios = knownStudios.filter((s) => {
-      if (s.key !== "") return true;
-      return days.some((d) => (map[`__${formatDateKey(d)}`] || []).length > 0);
-    });
+    const sortedMondays = [...weekMondaySet].sort();
+    const blocksHtml = sortedMondays
+      .map((monKey) => {
+        const start = parseYMD(monKey);
+        const days = Array.from({ length: 7 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
+        const end = days[6];
+        const isCurrentWeek = monKey === todayMondayKey;
 
-    const todayKey = formatDateKey(new Date());
-    const headCols = days
-      .map((d, i) => {
-        const key = formatDateKey(d);
-        const isToday = key === todayKey;
-        return `<th ${isToday ? 'data-is-today="true" style="background:var(--primary-soft);"' : ""}>
-          <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
-            <span>${WEEKDAYS[i]}</span>
-            ${isToday ? `<span class="today-badge">今天</span>` : ""}
-            ${renderHolidayBadges(key)}
-          </div>
-          <div style="font-weight:400;color:var(--text-muted);font-variant-numeric:tabular-nums;">${d.getMonth() + 1}月${d.getDate()}日</div>
-        </th>`;
-      })
-      .join("");
+        const visibleStudios = knownStudios.filter((s) => {
+          if (s.key !== "") return true;
+          return days.some((d) => (map[`__${formatDateKey(d)}`] || []).length > 0);
+        });
 
-    const bodyRows = visibleStudios
-      .map((studio) => {
-        const tds = days
-          .map((d) => {
-            const list = map[`${studio.key}__${formatDateKey(d)}`] || [];
+        const headCols = days
+          .map((d, i) => {
+            const key = formatDateKey(d);
+            const isToday = key === todayKey;
+            return `<th ${isToday ? 'data-is-today="true" style="background:var(--primary-soft);"' : ""}>
+              <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
+                <span>${WEEKDAYS[i]}</span>
+                ${isToday ? `<span class="today-badge">今天</span>` : ""}
+                ${renderHolidayBadges(key)}
+              </div>
+              <div style="font-weight:400;color:var(--text-muted);font-variant-numeric:tabular-nums;">${d.getMonth() + 1}月${d.getDate()}日</div>
+            </th>`;
+          })
+          .join("");
+
+        const bodyRows = visibleStudios
+          .map((studio) => {
+            const tds = days
+              .map((d) => {
+                const list = map[`${studio.key}__${formatDateKey(d)}`] || [];
+                return `
+                  <td class="week-cell">
+                    ${list.length ? `<div class="day-events">${list.map((e) => eventCardHtml(e, true)).join("")}</div>` : `<div class="empty-slot">—</div>`}
+                  </td>
+                `;
+              })
+              .join("");
             return `
-              <td class="week-cell">
-                ${list.length ? `<div class="day-events">${list.map((e) => eventCardHtml(e, true)).join("")}</div>` : `<div class="empty-slot">—</div>`}
-              </td>
+              <tr>
+                <td class="studio-col">
+                  <div class="studio-name">${escapeHtml(studio.name)}</div>
+                  <div class="studio-sub">${escapeHtml(studio.sub)}</div>
+                </td>
+                ${tds}
+              </tr>
             `;
           })
           .join("");
+
         return `
-          <tr>
-            <td class="studio-col">
-              <div class="studio-name">${escapeHtml(studio.name)}</div>
-              <div class="studio-sub">${escapeHtml(studio.sub)}</div>
-            </td>
-            ${tds}
-          </tr>
+          <div class="week-block" ${isCurrentWeek ? 'data-is-today="true"' : ""}>
+            <div class="week-banner">
+              <span>${start.getFullYear()}年${start.getMonth() + 1}月${start.getDate()}日 – ${end.getMonth() + 1}月${end.getDate()}日 ${isCurrentWeek ? '<span class="today-badge">本周</span>' : ""}</span>
+            </div>
+            <div class="week-scroll">
+              <table class="week-table">
+                <thead><tr><th class="studio-col">直播间泳道</th>${headCols}</tr></thead>
+                <tbody>${bodyRows}</tbody>
+              </table>
+            </div>
+          </div>
         `;
       })
       .join("");
 
-    document.getElementById("calendarRoot").innerHTML = `
-      <div class="week-scroll">
-        <table class="week-table">
-          <thead>
-            <tr><th class="studio-col">直播间泳道</th>${headCols}</tr>
-          </thead>
-          <tbody>${bodyRows}</tbody>
-        </table>
-      </div>
-    `;
+    document.getElementById("calendarRoot").innerHTML = blocksHtml;
   }
 
   function renderAgenda(filtered) {
-    document.getElementById("periodTitle").textContent = `全部日程 (${filtered.length} 场)`;
     if (!filtered.length) {
       document.getElementById("calendarRoot").innerHTML = `<div class="empty-state">当前筛选条件下暂无排期记录</div>`;
       return;
@@ -1021,36 +1026,8 @@
         state.view = btn.dataset.view;
         document.querySelectorAll(".seg-btn").forEach((b) => b.classList.toggle("active", b === btn));
         render();
+        scrollToTodayCell(false);
       });
-    });
-
-    document.getElementById("prevBtn").addEventListener("click", () => {
-      if (state.view === "month") {
-        const d = new Date(state.year, state.month - 1, 1);
-        state.year = d.getFullYear(); state.month = d.getMonth();
-      } else if (state.view === "week") {
-        state.weekStart = new Date(state.weekStart.getFullYear(), state.weekStart.getMonth(), state.weekStart.getDate() - 7);
-      }
-      render();
-    });
-
-    document.getElementById("nextBtn").addEventListener("click", () => {
-      if (state.view === "month") {
-        const d = new Date(state.year, state.month + 1, 1);
-        state.year = d.getFullYear(); state.month = d.getMonth();
-      } else if (state.view === "week") {
-        state.weekStart = new Date(state.weekStart.getFullYear(), state.weekStart.getMonth(), state.weekStart.getDate() + 7);
-      }
-      render();
-    });
-
-    document.getElementById("todayBtn").addEventListener("click", () => {
-      const now = new Date();
-      state.year = now.getFullYear();
-      state.month = now.getMonth();
-      state.weekStart = getMonday(now);
-      render();
-      scrollToTodayCell(true);
     });
 
     document.getElementById("searchInput").addEventListener("input", (e) => { state.search = e.target.value; render(); });
