@@ -240,6 +240,7 @@
 
   function updateHeaderMeta() {
     const modeMap = {
+      "dingtalk-3table": "钉钉三表联动同步",
       "dingtalk-api": "钉钉 API 自动同步",
       "csv-fallback": "排期快照",
       "csv-manual": "CSV 加密同步",
@@ -247,7 +248,7 @@
     };
     const badge = document.getElementById("syncBadge");
     badge.textContent = `${modeMap[state.meta.sourceMode] || "已就绪"} · ${state.events.length} 场`;
-    badge.className = `pill ${state.meta.sourceMode === "dingtalk-api" ? "success" : "warning"}`;
+    badge.className = `pill ${state.meta.sourceMode && state.meta.sourceMode.startsWith("dingtalk") ? "success" : "warning"}`;
     document.getElementById("syncTimeBadge").textContent = `上次同步：${state.meta.syncedAt || "--"}`;
 
     const srcLink = document.getElementById("sourceLink");
@@ -272,7 +273,9 @@
       if (state.conflictOnly && !e.isConflict && !e.hasAnomaly) return false;
       if (q) {
         const hay = [
-          e.displayTitle, e.type, e.speaker, e.host, e.ops, e.room, e.videoAccount, e.appAccount, e.detail,
+          e.displayTitle, e.type, e.speaker, e.host, e.ops, e.stageControl, e.streamPush,
+          e.room, e.videoAccount, e.appAccount, e.broadcastMode, e.coursePrice, e.salesType,
+          e.detail, e.scheduleNote,
         ].join(" ").toLowerCase();
         if (!hay.includes(q)) return false;
       }
@@ -541,8 +544,10 @@
 
     document.getElementById("modalBadges").innerHTML = `
       <span class="cat-badge cat-badge-${idx}">${escapeHtml(e.type || "未分类")}</span>
+      ${e.salesType ? `<span class="pill">${escapeHtml(e.salesType)}</span>` : ""}
       ${e.inviteStatus ? `<span class="pill ${e.inviteStatus === "已邀约" ? "success" : "warning"}">${escapeHtml(e.inviteStatus)}</span>` : ""}
       ${e.isConflict ? `<span class="pill danger">时段冲突</span>` : ""}
+      ${e.supplementSources?.length ? `<span class="pill success">已补充：${escapeHtml(e.supplementSources.join(" + "))}</span>` : ""}
     `;
     document.getElementById("modalTitle").textContent = e.displayTitle;
 
@@ -553,16 +558,21 @@
       ["视频号账号", e.videoAccount || "—"],
       ["APP 账号", e.appAccount || "—"],
       ["讲师", e.speaker || "—"],
-      ["主持人", e.host || "—"],
+      ["主持人 / 主播", e.host || "—"],
       ["对接运营", e.ops || "—"],
-      ["原表详情摘要", e.detail || "—"],
+      ["场控 / 推流", [e.stageControl ? `场控：${e.stageControl}` : "", e.streamPush ? `推流：${e.streamPush}` : ""].filter(Boolean).join(" · ") || "—"],
     ];
+    if (e.broadcastMode) items.push(["开播方式 / 平台", e.broadcastMode]);
+    if (e.coursePrice) items.push(["课程（客单价）", e.coursePrice]);
+    if (e.salesTarget) items.push(["转化目标", e.salesTarget]);
+    if (e.detail) items.push(["原表详情摘要", e.detail]);
 
     document.getElementById("modalBody").innerHTML = `
       ${alerts.length ? `<div class="alert-box"><strong>冲突 / 数据提醒：</strong><br>${escapeHtml(alerts.join("；"))}</div>` : ""}
       <div class="detail-grid">
         ${items.map(([k, v]) => `<div class="detail-item"><div class="detail-k">${k}</div><div class="detail-v">${escapeHtml(v)}</div></div>`).join("")}
       </div>
+      ${e.scheduleNote ? `<div class="detail-item"><div class="detail-k">直播时间表补充原文</div><div class="detail-v" style="font-weight:400;font-size:12.5px;line-height:1.55;">${escapeHtml(e.scheduleNote)}</div></div>` : ""}
     `;
     document.getElementById("modalBackdrop").classList.add("open");
   }
