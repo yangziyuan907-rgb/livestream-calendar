@@ -40,6 +40,8 @@ except Exception:
 
 DEFAULT_BASE_ID = "MNDoBb60VLrYNqLqInx6PzPA8lemrZQ3"
 DEFAULT_SHEET_ID = "AEFsFrm"
+DEFAULT_PRO_WORKBOOK_ID = "EpGBa2Lm8azZ5n4nFwmY4KDkWgN7R35y"   # 专业课直播汇总表
+DEFAULT_GRID_WORKBOOK_ID = "2Amq4vjg89gjdp9pSmqQqAv5V3kdP0wQ"  # 咨询师之家直播时间表（新版）
 DEFAULT_SOURCE_URL = (
     "https://alidocs.dingtalk.com/i/nodes/MNDoBb60VLrYNqLqInx6PzPA8lemrZQ3"
     "?utm_scene=person_space&iframeQuery=viewId%3Dc9vuiLa%26sheetId%3DAEFsFrm"
@@ -393,6 +395,675 @@ def fetch_dingtalk_records(
         print(f"[info] 未检测到需查表的关联 ID，样本字段结构: {shape}")
 
     return all_rows
+
+
+# ---------------- DingTalk Online Spreadsheet (Workbook) Readers ----------------
+
+def col_index_to_letter(col_1based: int) -> str:
+    """Convert 1-based column index to Excel A1 column letters (1->A, 26->Z, 27->AA)."""
+    out = ""
+    n = max(1, col_1based)
+    while n > 0:
+        n, rem = divmod(n - 1, 26)
+        out = chr(65 + rem) + out
+    return out
+
+
+def fetch_workbook_sheets(
+    access_token: str, workbook_id: str, operator_id: str
+) -> List[Dict[str, Any]]:
+    q = urllib.parse.urlencode({"operatorId": operator_id})
+    url = f"https://api.dingtalk.com/v1.0/doc/workbooks/{workbook_id}/sheets?{q}"
+    res = http_json("GET", url, headers={"x-acs-dingtalk-access-token": access_token})
+    return list(res.get("value") or res.get("sheets") or [])
+
+
+def fetch_workbook_sheet_grid(
+    access_token: str,
+    workbook_id: str,
+    sheet_id: str,
+    operator_id: str,
+    max_cols: int = 12,
+    chunk_rows: int = 100,
+) -> List[List[str]]:
+    """Fetch a DingTalk online spreadsheet worksheet as a 2D list of display strings."""
+    q = urllib.parse.urlencode({"operatorId": operator_id})
+    sheet_enc = urllib.parse.quote(sheet_id, safe="")
+    info_url = f"https://api.dingtalk.com/v1.0/doc/workbooks/{workbook_id}/sheets/{sheet_enc}?{q}"
+    info = http_json("GET", info_url, headers={"x-acs-dingtalk-access-token": access_token})
+    last_row = int(info.get("lastNonEmptyRow", -1))
+    last_col = int(info.get("lastNonEmptyColumn", -1))
+    if last_row < 0 or last_col < 0:
+        return []
+
+    total_rows = last_row + 1
+    total_cols = min(last_col + 1, max_cols)
+    end_col_letter = col_index_to_letter(total_cols)
+
+    grid: List[List[str]] = []
+    for start_r in range(1, total_rows + 1, chunk_rows):
+        end_r = min(start_r + chunk_rows - 1, total_rows)
+        rng = f"A{start_r}:{end_col_letter}{end_r}"
+        rq = urllib.parse.urlencode({"operatorId": operator_id, "select": "displayValues,values"})
+        r_url = f"https://api.dingtalk.com/v1.0/doc/workbooks/{workbook_id}/sheets/{sheet_enc}/ranges/{rng}?{rq}"
+        try:
+            res = http_json("GET", r_url, headers={"x-acs-dingtalk-access-token": access_token})
+        except RuntimeError:
+            rq_fb = urllib.parse.urlencode({"operatorId": operator_id})
+            r_url_fb = f"https://api.dingtalk.com/v1.0/doc/workbooks/{workbook_id}/sheets/{sheet_enc}/ranges/{rng}?{rq_fb}"
+            res = http_json("GET", r_url_fb, headers={"x-acs-dingtalk-access-token": access_token})
+        disp = res.get("displayValues") or []
+        vals = res.get("values") or []
+        row_count = max(len(disp), len(vals))
+        for i in range(row_count):
+            d_row = disp[i] if i < len(disp) else []
+            v_row = vals[i] if i < len(vals) else []
+            merged_row: List[str] = []
+            for j in range(total_cols):
+                dv = d_row[j] if j < len(d_row) else ""
+                vv = v_row[j] if j < len(v_row) else ""
+                cell = dv if str(dv or "").strip() else vv
+                merged_row.append(str(cell).strip() if cell is not None else "")
+            grid.append(merged_row)
+    return grid
+
+
+def _parse_time_range(text: str) -> Tuple[str, str]:
+    """Extract (start, end) HH:MM pair from strings like '18:00-20:00' or '18:00~19:40'."""
+    if not text:
+        return "", ""
+    m = re.search(r"(\d{1,2})\s*[:：]\s*(\d{2})\s*[-~—–至到]\s*(\d{1,2})\s*[:：]\s*(\d{2})", text)
+    if m:
+        s = f"{int(m.group(1)):02d}:{int(m.group(2)):02d}"
+        e = f"{int(m.group(3)):02d}:{int(m.group(4)):02d}"
+        return s, e
+    m2 = re.search(r"(\d{1,2})\s*[:：]\s*(\d{2})", text)
+    if m2:
+        return f"{int(m2.group(1)):02d}:{int(m2.group(2)):02d}", ""
+    return "", ""
+
+
+def _parse_cn_date(text: str, default_year: int, default_month: int = 0) -> str:
+    """Parse Chinese/standard date strings like '12月3日', '2026/12/3', '12.3' into YYYY-MM-DD."""
+    s = (text or "").strip()
+    if not s:
+        return ""
+    m_full = re.search(r"(\d{4})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})", s)
+    if m_full:
+        return f"{int(m_full.group(1)):04d}-{int(m_full.group(2)):02d}-{int(m_full.group(3)):02d}"
+    m_cn = re.search(r"(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]?", s)
+    if m_cn:
+        mo, dy = int(m_cn.group(1)), int(m_cn.group(2))
+        if 1 <= mo <= 12 and 1 <= dy <= 31:
+            return f"{default_year:04d}-{mo:02d}-{dy:02d}"
+    m_md = re.fullmatch(r"(\d{1,2})[/.](\d{1,2})", s)
+    if m_md:
+        mo, dy = int(m_md.group(1)), int(m_md.group(2))
+        if 1 <= mo <= 12 and 1 <= dy <= 31:
+            return f"{default_year:04d}-{mo:02d}-{dy:02d}"
+    if default_month and re.fullmatch(r"\d{1,2}", s):
+        dy = int(s)
+        if 1 <= dy <= 31:
+            return f"{default_year:04d}-{default_month:02d}-{dy:02d}"
+    return ""
+
+
+def _normalize_room_name(text: str) -> str:
+    s = (text or "").strip()
+    if not s:
+        return ""
+    if "19楼" in s or "19F" in s.upper():
+        return "19楼"
+    if "赏心悦室" in s:
+        return "21楼·赏心悦室"
+    if "就事论事" in s or "21楼" in s:
+        return "21楼·就事论事"
+    return ""
+
+
+def parse_pro_course_targets_grid(
+    grid: List[List[str]], default_year: int = 2026
+) -> List[Dict[str, Any]]:
+    """Parse `专业课直播汇总表` -> `26年月度直播目标` schedule blocks."""
+    records: List[Dict[str, Any]] = []
+    cur_year = default_year
+    cur_month = 0
+    col_map: Dict[str, int] = {}
+
+    for row in grid:
+        non_empty = [c.strip() for c in row if c.strip()]
+        if not non_empty:
+            continue
+
+        # Detect year/month banner rows like "12月" or "2027年1月"
+        if len(non_empty) <= 2:
+            joined = " ".join(non_empty)
+            m_ym = re.search(r"(?:(20\d{2})\s*年\s*)?(\d{1,2})\s*月", joined)
+            if m_ym and "日" not in joined:
+                new_m = int(m_ym.group(2))
+                if m_ym.group(1):
+                    cur_year = int(m_ym.group(1))
+                elif cur_month == 12 and new_m == 1:
+                    cur_year += 1
+                cur_month = new_m
+                continue
+
+        # Detect schedule header row ("日期", "时间", "老师", ...)
+        stripped = [c.strip() for c in row]
+        if "日期" in stripped and ("老师" in stripped or "讲师" in stripped):
+            col_map = {}
+            for idx, h in enumerate(stripped):
+                if h == "日期":
+                    col_map["date"] = idx
+                elif h == "时间":
+                    col_map["time"] = idx
+                elif h in ("老师", "讲师"):
+                    col_map["speaker"] = idx
+                elif "课程" in h:
+                    col_map["course"] = idx
+                elif h == "类型":
+                    col_map["salesType"] = idx
+                elif "目标" in h:
+                    col_map["target"] = idx
+                elif "状态" in h:
+                    col_map["status"] = idx
+                elif h in ("主持人", "主播"):
+                    col_map["host"] = idx
+            continue
+
+        if not col_map or "date" not in col_map:
+            continue
+
+        def cell(key: str) -> str:
+            idx = col_map.get(key)
+            return stripped[idx] if idx is not None and idx < len(stripped) else ""
+
+        date_str = _parse_cn_date(cell("date"), cur_year, cur_month)
+        if not date_str:
+            continue
+        start, end = _parse_time_range(cell("time"))
+        speaker = cell("speaker")
+        course = cell("course")
+        sales_type = cell("salesType")
+        target = cell("target")
+        status = cell("status")
+        host = cell("host")
+        if not any([speaker, course, status, host]):
+            continue
+
+        records.append(
+            {
+                "source": "专业课直播汇总表",
+                "date": date_str,
+                "start": start,
+                "end": end,
+                "speaker": speaker,
+                "coursePrice": course,
+                "salesType": sales_type,
+                "salesTarget": target,
+                "inviteStatus": status,
+                "host": host,
+                "category": "专业课",
+            }
+        )
+    return records
+
+
+def _resolve_week_dates(
+    header_row: List[str], cur_year: int, cur_month: int
+) -> Dict[int, str]:
+    """Resolve Mon..Sun (cols 1..7) dates accurately across month/year boundaries using weekday alignment."""
+    dates: Dict[int, str] = {}
+    # Candidate (year, month) pairs: current, previous, next
+    candidates: List[Tuple[int, int]] = []
+    if 1 <= cur_month <= 12:
+        prev_y, prev_m = (cur_year - 1, 12) if cur_month == 1 else (cur_year, cur_month - 1)
+        next_y, next_m = (cur_year + 1, 1) if cur_month == 12 else (cur_year, cur_month + 1)
+        candidates = [(cur_year, cur_month), (prev_y, prev_m), (next_y, next_m)]
+
+    for col in range(1, min(8, len(header_row))):
+        raw = header_row[col].strip()
+        if not raw:
+            continue
+        # Explicit full or month-day date
+        if any(ch in raw for ch in ("/", "-", ".", "月")):
+            parsed = _parse_cn_date(raw, cur_year, cur_month)
+            if parsed:
+                dates[col] = parsed
+                continue
+        m_day = re.fullmatch(r"(\d{1,2})[日号]?", raw)
+        if not m_day:
+            continue
+        day_num = int(m_day.group(1))
+        expected_wd = col - 1  # col 1 -> Monday (0) .. col 7 -> Sunday (6)
+        matched = ""
+        for cy, cm in candidates:
+            try:
+                d_obj = dt.date(cy, cm, day_num)
+            except ValueError:
+                continue
+            if d_obj.weekday() == expected_wd:
+                matched = d_obj.strftime("%Y-%m-%d")
+                break
+        if not matched and 1 <= cur_month <= 12:
+            # Fallback if sheet column order slightly differs
+            try:
+                matched = dt.date(cur_year, cur_month, day_num).strftime("%Y-%m-%d")
+            except ValueError:
+                matched = ""
+        if matched:
+            dates[col] = matched
+    return dates
+
+
+def _split_grid_cell_blocks(cell_text: str) -> List[str]:
+    """Split a weekly-grid cell that may stack multiple sessions into separate session blocks."""
+    lines = [ln.strip() for ln in cell_text.splitlines()]
+    blocks: List[List[str]] = []
+    cur: List[str] = []
+    session_starter = re.compile(
+        r"^(?:【(?:专业课|高价课|督导教学|咨询观摩|团督|平台产品|咨询伦理|朝阳)】|(?:\d+\s*[.、]\s*【))"
+    )
+    time_header = re.compile(r"^【时间】")
+    for ln in lines:
+        if not ln:
+            if cur:
+                blocks.append(cur)
+                cur = []
+            continue
+        if cur:
+            cur_joined = "\n".join(cur)
+            has_time = bool(re.search(r"\d{1,2}:\d{2}", cur_joined))
+            if session_starter.match(ln) and len(cur) >= 2 and (has_time or "讲师" in cur_joined or "场地" in cur_joined or "平台" in cur_joined):
+                blocks.append(cur)
+                cur = [ln]
+                continue
+            if time_header.match(ln) and has_time:
+                blocks.append(cur)
+                cur = [ln]
+                continue
+        cur.append(ln)
+    if cur:
+        blocks.append(cur)
+    return ["\n".join(b) for b in blocks if b]
+
+
+def _clean_person_token(raw: str) -> str:
+    s = (raw or "").strip()
+    s = re.split(r"(?:场控|主持人|主播|推流|运营|场地|直播间|平台|开播方式|时间|【|（|\()", s)[0]
+    s = s.strip(" ：:、，,;-|/")
+    return s
+
+
+def _parse_grid_session_block(block: str, date_str: str, category: str) -> Dict[str, Any]:
+    """Extract structured operational details from one free-form session block in 直播时间表."""
+    start, end = _parse_time_range(block)
+
+    speaker = ""
+    m_spk = re.search(r"(?:【?讲师】?|主讲|老师)\s*[:：]?\s*([^\n\r]+)", block)
+    if m_spk:
+        speaker = _clean_person_token(m_spk.group(1))
+
+    host = ""
+    m_host = re.search(r"(?:【?主持人】?|主播)\s*[:：]?\s*([^\n\r]+)", block)
+    if m_host:
+        host = _clean_person_token(m_host.group(1))
+
+    stage_control = ""
+    m_ctrl = re.search(r"(?:场控)\s*[:：]?\s*([^\n\r]+)", block)
+    if m_ctrl:
+        stage_control = _clean_person_token(m_ctrl.group(1))
+
+    stream_push = ""
+    m_push = re.search(r"(?:推流)\s*[:：]?\s*([^\n\r]+)", block)
+    if m_push:
+        stream_push = _clean_person_token(m_push.group(1))
+
+    room = _normalize_room_name(block)
+
+    broadcast_mode = ""
+    m_mode = re.search(r"(?:【?开播方式】?|【?平台】?)\s*[:：]?\s*([^\n\r]+)", block)
+    if m_mode:
+        bm = m_mode.group(1).strip()
+        bm = re.sub(r"[（(]\s*(?:19楼|21楼)[^）)]*[）)]", "", bm).strip(" ：:")
+        broadcast_mode = bm
+
+    title_hint = ""
+    m_title = re.search(r"【主题】\s*[:：]?\s*([^\n\r]+)", block)
+    if m_title:
+        title_hint = m_title.group(1).strip()
+    else:
+        for ln in block.splitlines():
+            ln_s = ln.strip()
+            if ln_s and not re.match(r"^(?:【?(?:时间|讲师|人员|负责|场地|开播方式|平台)】?|\d{1,2}:\d{2})", ln_s):
+                title_hint = ln_s
+                break
+
+    note_clean = " | ".join([ln.strip() for ln in block.splitlines() if ln.strip()])
+    if len(note_clean) > 360:
+        note_clean = note_clean[:357] + "..."
+
+    return {
+        "source": "咨询师之家直播时间表",
+        "date": date_str,
+        "category": category,
+        "start": start,
+        "end": end,
+        "titleHint": title_hint,
+        "speaker": speaker,
+        "host": host,
+        "stageControl": stage_control,
+        "streamPush": stream_push,
+        "room": room,
+        "broadcastMode": broadcast_mode,
+        "scheduleNote": note_clean,
+    }
+
+
+def parse_weekly_calendar_grid(
+    grid: List[List[str]], sheet_year: int
+) -> List[Dict[str, Any]]:
+    """Parse `咨询师之家直播时间表（新版）` -> `YYYY年直播时间` 2D weekly grid."""
+    records: List[Dict[str, Any]] = []
+    cur_year = sheet_year
+    cur_month = 0
+    week_dates: Dict[int, str] = {}
+
+    for row in grid:
+        if not row or not any(c.strip() for c in row):
+            continue
+        col0 = row[0].strip()
+
+        # Month banner row (e.g. "12月" or "2026年12月")
+        m_month = re.fullmatch(r"(?:(20\d{2})\s*年\s*)?(\d{1,2})\s*月", col0)
+        if m_month:
+            if m_month.group(1):
+                cur_year = int(m_month.group(1))
+            cur_month = int(m_month.group(2))
+            continue
+
+        # Also detect month banner in row if col0 is empty and only one cell says "12月"
+        non_empty = [c.strip() for c in row if c.strip()]
+        if len(non_empty) == 1:
+            m_single = re.fullmatch(r"(?:(20\d{2})\s*年\s*)?(\d{1,2})\s*月", non_empty[0])
+            if m_single:
+                if m_single.group(1):
+                    cur_year = int(m_single.group(1))
+                cur_month = int(m_single.group(2))
+                continue
+
+        # Week header row: col0 like "53周" or cols 1..7 hold day numbers
+        day_like = sum(
+            1 for c in row[1:8] if re.fullmatch(r"\d{1,2}[日号]?|\d{1,2}[/.月]\d{1,2}[日号]?", c.strip())
+        )
+        if re.match(r"^\d+\s*周", col0) or day_like >= 4:
+            # If cur_month wasn't explicitly set yet, infer month=1 at start of sheet
+            if cur_month == 0:
+                cur_month = 1
+            resolved = _resolve_week_dates(row, cur_year, cur_month)
+            if resolved:
+                week_dates = resolved
+                # Advance cur_month to the month of Sunday (or last date in this week) for continuity
+                last_d = sorted(resolved.values())[-1]
+                cur_year, cur_month = int(last_d[:4]), int(last_d[5:7])
+            continue
+
+        if not week_dates or not col0 or col0 in ("周", "日期", "星期"):
+            continue
+
+        # Category schedule row
+        category = col0
+        for col in range(1, min(8, len(row))):
+            cell_text = row[col].strip()
+            if not cell_text or col not in week_dates:
+                continue
+            d_str = week_dates[col]
+            for block in _split_grid_cell_blocks(cell_text):
+                parsed = _parse_grid_session_block(block, d_str, category)
+                if any(
+                    parsed[k]
+                    for k in ("speaker", "host", "stageControl", "streamPush", "broadcastMode", "titleHint", "start")
+                ):
+                    records.append(parsed)
+    return records
+
+
+def _category_compatible(ev_type: str, ev_title: str, sup_cat: str, sup_title: str = "") -> int:
+    """Return compatibility score (>0 compatible, <0 incompatible, 0 neutral)."""
+    et = (ev_type or "") + " " + (ev_title or "")
+    sc = (sup_cat or "") + " " + (sup_title or "")
+
+    groups = [
+        ("专业课", ("专业课", "高价课", "训练营线索", "催眠", "短焦", "CBT", "家庭治疗", "儿童分析师")),
+        ("百场督导", ("百场督导", "咨询观摩", "督导教学", "闭门会")),
+        ("团督", ("团督",)),
+        ("咨询伦理", ("伦理",)),
+        ("朝阳", ("朝阳", "初心咨询", "壹心理", "低转高", "学员访谈")),
+        ("平台产品", ("平台产品",)),
+    ]
+
+    def detect_group(text: str) -> str:
+        for gname, kws in groups:
+            if any(kw in text for kw in kws):
+                return gname
+        return ""
+
+    g_ev = detect_group(et)
+    g_sup = detect_group(sc)
+    if g_ev and g_sup:
+        if g_ev == g_sup:
+            return 30
+        # 专业课训练营/高价课 vs 朝阳训练营 are distinct
+        return -40
+    return 0
+
+
+def _keyword_overlap_score(text_a: str, text_b: str) -> int:
+    if not text_a or not text_b:
+        return 0
+    keywords = [
+        "CBT", "催眠", "短焦", "家庭治疗", "儿童分析师", "汤海鹏", "张海音", "张敬轩", "洪伟凯",
+        "付艳", "王灵", "许静", "童俊", "司雅梅", "高岚", "督导教学", "咨询观摩", "闭门会",
+        "伴侣治疗", "伦理", "初心", "壹心理", "自讲", "公开课", "答疑", "访谈", "低转高", "团督",
+    ]
+    hits = sum(1 for kw in keywords if kw.lower() in text_a.lower() and kw.lower() in text_b.lower())
+    return min(hits * 25, 50)
+
+
+def _times_compatible(a_start: str, a_end: str, b_start: str, b_end: str) -> int:
+    """Return +50 exact start match, +30 overlap, 0 if supplement has no time, -100 if disjoint."""
+    if not b_start:
+        return 0
+    if not a_start:
+        return 10
+    if a_start == b_start:
+        return 50
+    a_s, a_e = time_to_mins(a_start), time_to_mins(a_end)
+    b_s, b_e = time_to_mins(b_start), time_to_mins(b_end)
+    if a_s is None or b_s is None:
+        return 0
+    a_end_m = a_e if (a_e is not None and a_e > a_s) else a_s + 60
+    b_end_m = b_e if (b_e is not None and b_e > b_s) else b_s + 60
+    if a_s < b_end_m and b_s < a_end_m:
+        return 30
+    return -100
+
+
+def merge_supplements(
+    events: List[Dict[str, Any]],
+    pro_rows: List[Dict[str, Any]],
+    grid_rows: List[Dict[str, Any]],
+) -> Tuple[int, int]:
+    """Enrich main-table events with matched records from the 2 supplementary DingTalk workbooks."""
+    pro_by_date: Dict[str, List[Dict[str, Any]]] = {}
+    for r in pro_rows:
+        pro_by_date.setdefault(r["date"], []).append(r)
+
+    grid_by_date: Dict[str, List[Dict[str, Any]]] = {}
+    for r in grid_rows:
+        grid_by_date.setdefault(r["date"], []).append(r)
+
+    enriched_from_grid = 0
+    enriched_from_pro = 0
+
+    for ev in events:
+        ev.setdefault("stageControl", "")
+        ev.setdefault("streamPush", "")
+        ev.setdefault("broadcastMode", "")
+        ev.setdefault("coursePrice", "")
+        ev.setdefault("salesType", "")
+        ev.setdefault("salesTarget", "")
+        ev.setdefault("scheduleNote", "")
+        ev.setdefault("supplementSources", [])
+
+        if not ev.get("date"):
+            continue
+
+        # 1. Match against Spreadsheet 2 (咨询师之家直播时间表)
+        best_grid = None
+        best_grid_score = 0
+        for cand in grid_by_date.get(ev["date"], []):
+            t_score = _times_compatible(ev["start"], ev["end"], cand["start"], cand["end"])
+            if t_score < 0:
+                continue
+            if ev["room"] and cand["room"] and ev["room"] != cand["room"]:
+                continue
+            if ev["speaker"] and cand["speaker"] and ev["speaker"] not in cand["speaker"] and cand["speaker"] not in ev["speaker"]:
+                continue
+
+            cat_score = _category_compatible(ev["type"], ev["displayTitle"], cand["category"], cand["titleHint"])
+            if cat_score < 0:
+                continue
+            kw_score = _keyword_overlap_score(ev["displayTitle"], cand["titleHint"] + " " + cand["scheduleNote"])
+            spk_bonus = 40 if (ev["speaker"] and cand["speaker"] and (ev["speaker"] in cand["speaker"] or cand["speaker"] in ev["speaker"])) else 0
+            room_bonus = 10 if (ev["room"] and cand["room"] and ev["room"] == cand["room"]) else 0
+            score = t_score + cat_score + kw_score + spk_bonus + room_bonus
+            # Require strong confidence: either time+cat/kw (>=55) or untimed cat+kw (>=50)
+            threshold = 50 if not cand["start"] else 55
+            if score >= threshold and score > best_grid_score:
+                best_grid_score = score
+                best_grid = cand
+
+        if best_grid:
+            enriched_from_grid += 1
+            if "咨询师之家直播时间表" not in ev["supplementSources"]:
+                ev["supplementSources"].append("咨询师之家直播时间表")
+            if not ev["speaker"] and best_grid["speaker"]:
+                ev["speaker"] = best_grid["speaker"]
+            if not ev["host"] and best_grid["host"]:
+                ev["host"] = best_grid["host"]
+            if best_grid["stageControl"]:
+                ev["stageControl"] = best_grid["stageControl"]
+                if not ev["ops"]:
+                    ev["ops"] = best_grid["stageControl"]
+            if best_grid["streamPush"]:
+                ev["streamPush"] = best_grid["streamPush"]
+            if not ev["room"] and best_grid["room"]:
+                ev["room"] = best_grid["room"]
+            if best_grid["broadcastMode"]:
+                ev["broadcastMode"] = best_grid["broadcastMode"]
+                if not ev["appAccount"] and ("APP" in best_grid["broadcastMode"].upper() or "咨家" in best_grid["broadcastMode"]):
+                    if "仅视频号" not in best_grid["broadcastMode"]:
+                        ev["appAccount"] = "咨询师之家APP"
+                if not ev["videoAccount"] and "视频号" in best_grid["broadcastMode"]:
+                    ev["videoAccount"] = "咨询师之家"
+            if best_grid["scheduleNote"]:
+                ev["scheduleNote"] = best_grid["scheduleNote"]
+
+        # 2. Match against Spreadsheet 1 (专业课直播汇总表)
+        best_pro = None
+        best_pro_score = 0
+        for cand in pro_by_date.get(ev["date"], []):
+            t_score = _times_compatible(ev["start"], ev["end"], cand["start"], cand["end"])
+            if t_score < 0:
+                continue
+            if ev["speaker"] and cand["speaker"] and ev["speaker"] not in cand["speaker"] and cand["speaker"] not in ev["speaker"]:
+                continue
+            cat_score = _category_compatible(ev["type"], ev["displayTitle"], cand["category"], cand["coursePrice"])
+            if cat_score < 0:
+                continue
+            kw_score = _keyword_overlap_score(ev["displayTitle"], cand["coursePrice"] + " " + cand["speaker"])
+            spk_bonus = 40 if (ev["speaker"] and cand["speaker"] and (ev["speaker"] in cand["speaker"] or cand["speaker"] in ev["speaker"])) else 0
+            score = t_score + cat_score + kw_score + spk_bonus
+            if score >= 55 and score > best_pro_score:
+                best_pro_score = score
+                best_pro = cand
+
+        if best_pro:
+            enriched_from_pro += 1
+            if "专业课直播汇总表" not in ev["supplementSources"]:
+                ev["supplementSources"].append("专业课直播汇总表")
+            if not ev["speaker"] and best_pro["speaker"]:
+                ev["speaker"] = best_pro["speaker"]
+            if not ev["host"] and best_pro["host"]:
+                ev["host"] = best_pro["host"]
+            if best_pro["coursePrice"]:
+                ev["coursePrice"] = best_pro["coursePrice"]
+            if best_pro["salesType"]:
+                ev["salesType"] = best_pro["salesType"]
+            if best_pro["salesTarget"]:
+                ev["salesTarget"] = best_pro["salesTarget"]
+            if best_pro["inviteStatus"] and (not ev["inviteStatus"] or (ev["inviteStatus"] == "未邀约" and "已邀约" in best_pro["inviteStatus"])):
+                ev["inviteStatus"] = "已邀约" if "已邀约" in best_pro["inviteStatus"] else best_pro["inviteStatus"]
+
+        # Recompute anomalies if room was filled in by supplement
+        if ev["room"] and "未分配直播间" in ev["anomalyReasons"]:
+            ev["anomalyReasons"] = [a for a in ev["anomalyReasons"] if a != "未分配直播间"]
+        ev["hasAnomaly"] = bool(ev["anomalyReasons"]) or bool(ev["isConflict"])
+
+    return enriched_from_pro, enriched_from_grid
+
+
+def fetch_supplementary_workbooks(
+    access_token: str,
+    operator_id: str,
+    pro_workbook_id: str,
+    grid_workbook_id: str,
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Fetch and parse both supplementary DingTalk online spreadsheets safely."""
+    pro_rows: List[Dict[str, Any]] = []
+    grid_rows: List[Dict[str, Any]] = []
+
+    if pro_workbook_id:
+        try:
+            sheets = fetch_workbook_sheets(access_token, pro_workbook_id, operator_id)
+            target_sheets = [
+                s for s in sheets if "月度直播目标" in str(s.get("name") or "")
+            ]
+            for s in target_sheets:
+                sname = str(s.get("name") or "")
+                sid = str(s.get("id") or sname)
+                m_yr = re.search(r"(\d{2,4})\s*年", sname)
+                yr = 2026
+                if m_yr:
+                    y_num = int(m_yr.group(1))
+                    yr = y_num if y_num >= 2000 else 2000 + y_num
+                grid = fetch_workbook_sheet_grid(access_token, pro_workbook_id, sid, operator_id, max_cols=12)
+                parsed = parse_pro_course_targets_grid(grid, default_year=yr)
+                pro_rows.extend(parsed)
+            print(f"[info] 补充表1（专业课直播汇总表）读取成功：解析 {len(pro_rows)} 条排期目标")
+        except Exception as exc:
+            print(f"[warn] 读取补充表1（专业课直播汇总表）失败，将跳过补充: {exc}", file=sys.stderr)
+
+    if grid_workbook_id:
+        try:
+            sheets = fetch_workbook_sheets(access_token, grid_workbook_id, operator_id)
+            # SECURITY: strictly whitelist ONLY `YYYY年直播时间` tabs (never read 直播账号会议室!)
+            for s in sheets:
+                sname = str(s.get("name") or "").strip()
+                m_yr = re.fullmatch(r"(202[6-9]|203\d)年直播时间", sname)
+                if not m_yr:
+                    continue
+                sid = str(s.get("id") or sname)
+                yr = int(m_yr.group(1))
+                grid = fetch_workbook_sheet_grid(access_token, grid_workbook_id, sid, operator_id, max_cols=8)
+                parsed = parse_weekly_calendar_grid(grid, sheet_year=yr)
+                grid_rows.extend(parsed)
+            print(f"[info] 补充表2（咨询师之家直播时间表）读取成功：解析 {len(grid_rows)} 条时间表记录")
+        except Exception as exc:
+            print(f"[warn] 读取补充表2（咨询师之家直播时间表）失败，将跳过补充: {exc}", file=sys.stderr)
+
+    return pro_rows, grid_rows
 
 
 def extract_text(val: Any) -> str:
@@ -906,8 +1577,13 @@ def main() -> int:
     mobile = os.getenv("DINGTALK_MOBILE", "").strip()
     base_id = os.getenv("DINGTALK_BASE_ID", DEFAULT_BASE_ID).strip() or DEFAULT_BASE_ID
     sheet_id = os.getenv("DINGTALK_SHEET_ID", DEFAULT_SHEET_ID).strip() or DEFAULT_SHEET_ID
+    pro_workbook_id = os.getenv("DINGTALK_PRO_WORKBOOK_ID", DEFAULT_PRO_WORKBOOK_ID).strip()
+    grid_workbook_id = os.getenv("DINGTALK_GRID_WORKBOOK_ID", DEFAULT_GRID_WORKBOOK_ID).strip()
 
     use_api = args.csv is None and bool(app_key and app_secret and (operator_id or user_id or mobile))
+
+    pro_rows: List[Dict[str, Any]] = []
+    grid_rows: List[Dict[str, Any]] = []
 
     if use_api:
         print(f"[info] 正在连接钉钉 AI 表格 API (baseId={base_id}, sheetId={sheet_id})...")
@@ -921,6 +1597,9 @@ def main() -> int:
         raw_rows = fetch_dingtalk_records(token, base_id, sheet_id, operator_id)
         source_mode = "dingtalk-api"
         print(f"[info] 成功从钉钉拉取 {len(raw_rows)} 条原始记录")
+        pro_rows, grid_rows = fetch_supplementary_workbooks(
+            token, operator_id, pro_workbook_id, grid_workbook_id
+        )
     else:
         csv_path = args.csv if args.csv else (repo_root / "data" / "schedule.csv")
         if not csv_path.exists():
@@ -934,6 +1613,14 @@ def main() -> int:
         source_mode = "csv-fallback" if args.csv is None else "csv-manual"
 
     events = build_events(raw_rows)
+    if pro_rows or grid_rows:
+        n_pro, n_grid = merge_supplements(events, pro_rows, grid_rows)
+        print(
+            f"[info] 三表合并完成：从「专业课直播汇总表」补充 {n_pro} 场，"
+            f"从「咨询师之家直播时间表」补充 {n_grid} 场"
+        )
+        if n_pro > 0 or n_grid > 0:
+            source_mode = "dingtalk-3table"
     changed = write_outputs(
         events,
         out_dir,
