@@ -23,6 +23,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 import urllib.error
 import urllib.parse
@@ -584,21 +585,81 @@ def compute_content_hash(events: List[Dict[str, Any]], source_mode: str, source_
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
 
 
+def run_crypto_helper(mode: str, text: str, password: str) -> str:
+    helper = Path(__file__).resolve().parent / "encrypt_aes_gcm.mjs"
+    env = dict(os.environ)
+    env["CALENDAR_PASSWORD"] = password
+    proc = subprocess.run(
+        ["node", str(helper), mode],
+        input=text,
+        text=True,
+        capture_output=True,
+        env=env,
+        check=False,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(f"AES-GCM {mode} 失败: {proc.stderr.strip()}")
+    return proc.stdout
+
+
 def write_outputs(
     events: List[Dict[str, Any]],
     out_dir: Path,
     source_mode: str,
     source_url: str,
+    password: str = "",
     force: bool = False,
 ) -> bool:
-    """Write JSON, JS fallback bundle, and ICS. Returns True if files were updated."""
+    """Write encrypted or plaintext calendar data. Returns True if files were updated."""
     data_dir = out_dir / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
     json_path = data_dir / "schedule.json"
     js_path = data_dir / "schedule-data.js"
+    enc_path = data_dir / "schedule.enc.json"
     ics_path = out_dir / "calendar.ics"
 
     content_hash = compute_content_hash(events, source_mode, source_url)
+
+    if password:
+        # Remove any leftover plaintext artifacts so secrets never leak to public Pages
+        for stale in (json_path, js_path, ics_path):
+            if stale.exists():
+                stale.unlink()
+
+        if not force and enc_path.exists():
+            try:
+                prev_plain = run_crypto_helper("decrypt", enc_path.read_text(encoding="utf-8"), password)
+                prev = json.loads(prev_plain)
+                if (prev.get("meta") or {}).get("contentHash") == content_hash:
+                    return False
+            except Exception:
+                # Password changed or file corrupted -> re-encrypt
+                pass
+
+        synced_at = dt.datetime.now(SHANGHAI_TZ).strftime("%Y-%m-%d %H:%M:%S")
+        payload = {
+            "meta": {
+                "syncedAt": synced_at,
+                "timezone": "Asia/Shanghai",
+                "sourceMode": source_mode,
+                "sourceUrl": source_url,
+                "contentHash": content_hash,
+                "encrypted": True,
+                "total": len(events),
+                "conflicts": sum(1 for e in events if e["isConflict"]),
+                "anomalies": sum(1 for e in events if e["hasAnomaly"]),
+            },
+            "events": events,
+        }
+        plain_json = json.dumps(payload, ensure_ascii=False)
+        encrypted_json = run_crypto_helper("encrypt", plain_json, password)
+        enc_path.write_text(encrypted_json, encoding="utf-8")
+        return True
+
+    # Plaintext mode (when CALENDAR_PASSWORD is not configured)
+    if enc_path.exists():
+        enc_path.unlink()
+
     if not force and json_path.exists() and js_path.exists() and ics_path.exists():
         try:
             prev = json.loads(json_path.read_text(encoding="utf-8"))
@@ -615,6 +676,7 @@ def write_outputs(
             "sourceMode": source_mode,
             "sourceUrl": source_url,
             "contentHash": content_hash,
+            "encrypted": False,
             "total": len(events),
             "conflicts": sum(1 for e in events if e["isConflict"]),
             "anomalies": sum(1 for e in events if e["hasAnomaly"]),
@@ -632,9 +694,11 @@ def write_outputs(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="同步钉钉 AI 表格或本地 CSV 到日历 JSON 与 ICS")
+    parser = argparse.ArgumentParser(description="同步钉钉 AI 表格或本地 CSV 到日历 JSON（支持 AES-256-GCM 加密）与 ICS")
     parser.add_argument("--csv", type=Path, default=None, help="强制从指定 CSV 文件生成（跳过钉钉 API）")
     parser.add_argument("--out", type=Path, default=Path("docs"), help="输出目录（默认 docs）")
+    parser.add_argument("--password", type=str, default=None, help="启用 AES-256-GCM 加密的访问密码（默认读取 CALENDAR_PASSWORD）")
+    parser.add_argument("--require-encryption", action="store_true", help="强制要求加密密码，防止意外明文发布")
     parser.add_argument("--force", action="store_true", help="即使内容无变化也强制重新写入文件")
     args = parser.parse_args()
 
@@ -643,6 +707,11 @@ def main() -> int:
 
     out_dir = args.out if args.out.is_absolute() else (repo_root / args.out)
     source_url = os.getenv("DINGTALK_SOURCE_URL", DEFAULT_SOURCE_URL)
+    password = (args.password if args.password is not None else os.getenv("CALENDAR_PASSWORD", "")).strip()
+
+    if args.require_encryption and not password:
+        print("[error] 已开启 --require-encryption，但未设置 CALENDAR_PASSWORD，已中止以防明文泄露", file=sys.stderr)
+        return 1
 
     app_key = os.getenv("DINGTALK_APP_KEY", "").strip()
     app_secret = os.getenv("DINGTALK_APP_SECRET", "").strip()
@@ -665,6 +734,9 @@ def main() -> int:
     else:
         csv_path = args.csv if args.csv else (repo_root / "data" / "schedule.csv")
         if not csv_path.exists():
+            if (out_dir / "data" / "schedule.enc.json").exists():
+                print("[info] 未配置钉钉 API 且无本地 CSV，保留现有加密排期文件直接部署")
+                return 0
             print(f"[error] 未配置钉钉 API 密钥，且未找到回退 CSV 文件: {csv_path}", file=sys.stderr)
             return 1
         print(f"[info] 使用 CSV 数据源生成日历: {csv_path}")
@@ -672,20 +744,22 @@ def main() -> int:
         source_mode = "csv-fallback" if args.csv is None else "csv-manual"
 
     events = build_events(raw_rows)
-    changed = write_outputs(events, out_dir, source_mode=source_mode, source_url=source_url, force=args.force)
+    changed = write_outputs(
+        events,
+        out_dir,
+        source_mode=source_mode,
+        source_url=source_url,
+        password=password,
+        force=args.force,
+    )
 
     conflicts = sum(1 for e in events if e["isConflict"])
     undated = sum(1 for e in events if not e["date"])
+    target_desc = f"{out_dir / 'data' / 'schedule.enc.json'}（AES-256-GCM 加密）" if password else f"{out_dir / 'data' / 'schedule.json'} 与 {out_dir / 'calendar.ics'}"
     if changed:
-        print(
-            f"[ok] 已生成 {out_dir / 'data' / 'schedule.json'} 与 {out_dir / 'calendar.ics'} | "
-            f"共 {len(events)} 场直播，冲突 {conflicts} 场，缺日期 {undated} 场"
-        )
+        print(f"[ok] 已生成 {target_desc} | 共 {len(events)} 场直播，冲突 {conflicts} 场，缺日期 {undated} 场")
     else:
-        print(
-            f"[ok] 排期内容无变化，跳过写入（避免无效 commit）| "
-            f"共 {len(events)} 场直播，冲突 {conflicts} 场，缺日期 {undated} 场"
-        )
+        print(f"[ok] 排期内容无变化，跳过写入（避免无效 commit）| 共 {len(events)} 场直播，冲突 {conflicts} 场，缺日期 {undated} 场")
     return 0
 
 
