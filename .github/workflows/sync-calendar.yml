@@ -44,6 +44,7 @@ jobs:
       - name: Sync & encrypt schedule from DingTalk AI Table
         env:
           CALENDAR_PASSWORD: ${{ secrets.CALENDAR_PASSWORD }}
+          GH_TRIGGER_TOKEN: ${{ secrets.GH_TRIGGER_TOKEN }}
           DINGTALK_APP_KEY: ${{ secrets.DINGTALK_APP_KEY }}
           DINGTALK_APP_SECRET: ${{ secrets.DINGTALK_APP_SECRET }}
           DINGTALK_OPERATOR_ID: ${{ secrets.DINGTALK_OPERATOR_ID }}
