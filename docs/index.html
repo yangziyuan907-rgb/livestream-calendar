@@ -48,6 +48,14 @@
           <span id="syncBadge" class="pill success">加载中…</span>
           <span id="syncTimeBadge" class="pill">同步时间：--</span>
           <span id="encBadge" class="pill success hidden">🔒 AES-256 已加密</span>
+          <button id="refreshBtn" class="btn btn-compact" type="button" title="拉取最新同步的排期数据">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+            <span id="refreshBtnLabel">刷新</span>
+          </button>
         </div>
         <p class="brand-sub">
           核心信息一目了然：时间段 · 主题 · 19楼 / 21楼并行直播间 · 讲师 / 主持 / 运营 · 邀约状态 · 自动冲突预警
@@ -65,12 +73,9 @@
           <input id="csvInput" type="file" accept=".csv,text/csv" hidden />
         </label>
         <button id="themeBtn" class="btn" type="button" title="切换浅色 / 深色模式">深色模式</button>
-        <button id="lockBtn" class="btn hidden" type="button" title="清除本机记住的密码并锁定">锁定</button>
+        <button id="lockBtn" class="btn hidden" type="button" title="退出登录并清除本机记住的密码">退出</button>
       </div>
     </header>
-
-    <!-- KPI Summary -->
-    <section class="kpi-grid" id="kpiBar"></section>
 
     <!-- Controls & Filters -->
     <section class="card controls">
@@ -128,6 +133,9 @@
 
     <!-- Calendar View Container -->
     <main id="calendarRoot" class="card calendar-shell"></main>
+
+    <!-- KPI Summary (placed below calendar so the schedule table stays unobstructed) -->
+    <section class="kpi-grid" id="kpiBar"></section>
 
     <footer class="footer-note">
       由 GitHub Actions 自动同步并加密发布 · 本机解锁后自动记住密码，下次直接查看
