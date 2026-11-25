@@ -24,6 +24,7 @@
   const state = {
     encryptedEnvelope: null,
     isEncryptedMode: false,
+    activePassword: "",
     meta: {},
     events: [],
     view: "month",
@@ -197,26 +198,56 @@
 
     const months = [...new Set(state.events.map((e) => (e.date || "").slice(0, 7)).filter((m) => /^\d{4}-\d{2}$/.test(m)))].sort();
     const quickEl = document.getElementById("quickMonths");
-    quickEl.innerHTML = months
+    quickEl.className = "quick-months-wrap";
+
+    const jumpToYM = (ym) => {
+      if (!ym || !ym.includes("-")) return;
+      const [y, m] = ym.split("-").map(Number);
+      state.year = y;
+      state.month = m - 1;
+      const firstInMonth = state.events.find((e) => e.date && e.date.startsWith(ym));
+      if (firstInMonth) {
+        const [fy, fm, fd] = firstInMonth.date.split("-").map(Number);
+        state.weekStart = getMonday(new Date(fy, fm - 1, fd));
+      } else {
+        state.weekStart = getMonday(new Date(y, m - 1, 1));
+      }
+      render();
+    };
+
+    const primaryMonths = months.slice(0, 3);
+    const extraMonths = months.slice(3);
+    let quickHtml = primaryMonths
       .map((ym) => {
         const [y, m] = ym.split("-").map(Number);
-        return `<button type="button" class="btn btn-ghost quick-month-btn" data-y="${y}" data-m="${m - 1}">${y}年${m}月</button>`;
+        return `<button type="button" class="btn btn-ghost quick-month-btn" data-ym="${ym}">${y}年${m}月</button>`;
       })
       .join("");
+    if (extraMonths.length) {
+      quickHtml +=
+        `<select id="moreMonthsSelect" class="select quick-month-select" aria-label="更多月份">` +
+        `<option value="">更多月份 (${extraMonths.length})</option>` +
+        extraMonths
+          .map((ym) => {
+            const [y, m] = ym.split("-").map(Number);
+            return `<option value="${ym}">${y}年${m}月</option>`;
+          })
+          .join("") +
+        `</select>`;
+    }
+    quickEl.innerHTML = quickHtml;
     quickEl.querySelectorAll(".quick-month-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        state.year = Number(btn.dataset.y);
-        state.month = Number(btn.dataset.m);
-        const firstInMonth = state.events.find((e) => e.date && e.date.startsWith(`${state.year}-${String(state.month + 1).padStart(2, "0")}`));
-        if (firstInMonth) {
-          const [y, m, d] = firstInMonth.date.split("-").map(Number);
-          state.weekStart = getMonday(new Date(y, m - 1, d));
-        } else {
-          state.weekStart = getMonday(new Date(state.year, state.month, 1));
-        }
-        render();
-      });
+      btn.addEventListener("click", () => jumpToYM(btn.dataset.ym));
     });
+    const moreSel = document.getElementById("moreMonthsSelect");
+    if (moreSel) {
+      moreSel.addEventListener("change", (e) => {
+        if (e.target.value) {
+          jumpToYM(e.target.value);
+          e.target.value = "";
+        }
+      });
+    }
 
     document.getElementById("legendBar").innerHTML =
       `<strong style="color:var(--text);">图例：</strong>` +
@@ -794,6 +825,7 @@
       errEl.classList.add("hidden");
       try {
         const data = await decryptEnvelope(state.encryptedEnvelope, pw);
+        state.activePassword = pw;
         if (remember) localStorage.setItem(PASS_STORAGE_KEY, pw);
         else localStorage.removeItem(PASS_STORAGE_KEY);
         document.getElementById("passwordInput").value = "";
@@ -812,11 +844,14 @@
 
     document.getElementById("lockBtn").addEventListener("click", () => {
       localStorage.removeItem(PASS_STORAGE_KEY);
+      state.activePassword = "";
       state.events = [];
       state.meta = {};
       showLockScreen("");
-      showToast("已锁定并清除本机记住的密码");
+      showToast("已退出登录并清除本机记住的密码");
     });
+
+    document.getElementById("refreshBtn").addEventListener("click", refreshLatestData);
 
     document.querySelectorAll(".seg-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -906,6 +941,74 @@
     });
   }
 
+  async function refreshLatestData() {
+    const btn = document.getElementById("refreshBtn");
+    const label = document.getElementById("refreshBtnLabel");
+    if (!btn || btn.disabled) return;
+    btn.disabled = true;
+    btn.classList.add("spinning");
+    if (label) label.textContent = "刷新中…";
+
+    const prevSyncedAt = state.meta.syncedAt || "";
+    const prevHash = state.meta.contentHash || "";
+    try {
+      const res = await fetch(`./data/schedule.enc.json?t=${Date.now()}`, { cache: "no-store" });
+      if (res.ok) {
+        const envelope = await res.json();
+        if (envelope && envelope.encrypted) {
+          state.encryptedEnvelope = envelope;
+          state.isEncryptedMode = true;
+          const pw = state.activePassword || localStorage.getItem(PASS_STORAGE_KEY) || "";
+          if (!pw) {
+            showLockScreen("请输入访问密码以加载最新排期");
+            return;
+          }
+          let data;
+          try {
+            data = await decryptEnvelope(envelope, pw);
+          } catch {
+            localStorage.removeItem(PASS_STORAGE_KEY);
+            state.activePassword = "";
+            showLockScreen("团队访问密码已更新，请重新输入新密码");
+            return;
+          }
+          // Preserve current month/week & filter selections while refreshing data
+          state.meta = data.meta || {};
+          state.events = data.events || [];
+          updateHeaderMeta();
+          populateFilterControls();
+          render();
+          const changed = (state.meta.contentHash && state.meta.contentHash !== prevHash) ||
+                          (state.meta.syncedAt && state.meta.syncedAt !== prevSyncedAt);
+          showToast(
+            changed
+              ? `已更新最新排期（共 ${state.events.length} 场 · ${state.meta.syncedAt || ""}）`
+              : `当前已是最新数据（上次同步：${state.meta.syncedAt || "--"}）`
+          );
+          return;
+        }
+      }
+      const resPlain = await fetch(`./data/schedule.json?t=${Date.now()}`, { cache: "no-store" });
+      if (resPlain.ok) {
+        const data = await resPlain.json();
+        state.meta = data.meta || {};
+        state.events = data.events || [];
+        updateHeaderMeta();
+        populateFilterControls();
+        render();
+        showToast(`已刷新排期数据（共 ${state.events.length} 场）`);
+        return;
+      }
+      showToast("刷新失败：未获取到远端排期文件");
+    } catch {
+      showToast("网络异常，请稍后重试刷新");
+    } finally {
+      btn.disabled = false;
+      btn.classList.remove("spinning");
+      if (label) label.textContent = "刷新";
+    }
+  }
+
   async function loadSchedule() {
     // 1. Prefer AES-256-GCM encrypted payload (schedule.enc.json)
     try {
@@ -920,6 +1023,7 @@
           if (savedPass) {
             try {
               const data = await decryptEnvelope(envelope, savedPass);
+              state.activePassword = savedPass;
               showAppWithData(data);
               return;
             } catch {
