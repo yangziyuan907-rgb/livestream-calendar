@@ -21,10 +21,140 @@
 
   const WEEKDAYS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 
+  // 2026 & 2027 China Official Statutory Holidays (国务院放假调休安排) + Festivals (incl. 情人节 & 儿童节)
+  const CHINA_STATUTORY_HOLIDAYS = {
+    // ---- 2026 ----
+    "2026-01-01": { kind: "off", name: "元旦" },
+    "2026-01-02": { kind: "off", name: "元旦休" },
+    "2026-01-03": { kind: "off", name: "元旦休" },
+    "2026-01-04": { kind: "work", name: "补班" },
+    "2026-02-14": { kind: "work", name: "补班" },
+    "2026-02-15": { kind: "off", name: "春节休" },
+    "2026-02-16": { kind: "off", name: "除夕" },
+    "2026-02-17": { kind: "off", name: "春节" },
+    "2026-02-18": { kind: "off", name: "春节休" },
+    "2026-02-19": { kind: "off", name: "春节休" },
+    "2026-02-20": { kind: "off", name: "春节休" },
+    "2026-02-21": { kind: "off", name: "春节休" },
+    "2026-02-22": { kind: "off", name: "春节休" },
+    "2026-02-23": { kind: "off", name: "春节休" },
+    "2026-02-28": { kind: "work", name: "补班" },
+    "2026-04-04": { kind: "off", name: "清明休" },
+    "2026-04-05": { kind: "off", name: "清明节" },
+    "2026-04-06": { kind: "off", name: "清明休" },
+    "2026-05-01": { kind: "off", name: "劳动节" },
+    "2026-05-02": { kind: "off", name: "五一休" },
+    "2026-05-03": { kind: "off", name: "五一休" },
+    "2026-05-04": { kind: "off", name: "五一休" },
+    "2026-05-05": { kind: "off", name: "五一休" },
+    "2026-05-09": { kind: "work", name: "补班" },
+    "2026-06-19": { kind: "off", name: "端午节" },
+    "2026-06-20": { kind: "off", name: "端午休" },
+    "2026-06-21": { kind: "off", name: "端午休" },
+    "2026-09-20": { kind: "work", name: "补班" },
+    "2026-09-25": { kind: "off", name: "中秋节" },
+    "2026-09-26": { kind: "off", name: "中秋休" },
+    "2026-09-27": { kind: "off", name: "中秋休" },
+    "2026-10-01": { kind: "off", name: "国庆节" },
+    "2026-10-02": { kind: "off", name: "国庆休" },
+    "2026-10-03": { kind: "off", name: "国庆休" },
+    "2026-10-04": { kind: "off", name: "国庆休" },
+    "2026-10-05": { kind: "off", name: "国庆休" },
+    "2026-10-06": { kind: "off", name: "国庆休" },
+    "2026-10-07": { kind: "off", name: "国庆休" },
+    "2026-10-10": { kind: "work", name: "补班" },
+    // ---- 2027 ----
+    "2027-01-01": { kind: "off", name: "元旦" },
+    "2027-01-02": { kind: "off", name: "元旦休" },
+    "2027-01-03": { kind: "off", name: "元旦休" },
+    "2027-01-31": { kind: "work", name: "补班" },
+    "2027-02-05": { kind: "off", name: "除夕" },
+    "2027-02-06": { kind: "off", name: "春节" },
+    "2027-02-07": { kind: "off", name: "春节休" },
+    "2027-02-08": { kind: "off", name: "春节休" },
+    "2027-02-09": { kind: "off", name: "春节休" },
+    "2027-02-10": { kind: "off", name: "春节休" },
+    "2027-02-11": { kind: "off", name: "春节休" },
+    "2027-02-12": { kind: "off", name: "春节休" },
+    "2027-02-13": { kind: "off", name: "春节休" },
+    "2027-02-14": { kind: "work", name: "补班" },
+    "2027-04-03": { kind: "off", name: "清明休" },
+    "2027-04-04": { kind: "off", name: "清明休" },
+    "2027-04-05": { kind: "off", name: "清明节" },
+    "2027-05-01": { kind: "off", name: "劳动节" },
+    "2027-05-02": { kind: "off", name: "五一休" },
+    "2027-05-03": { kind: "off", name: "五一休" },
+    "2027-05-04": { kind: "off", name: "五一休" },
+    "2027-05-05": { kind: "off", name: "五一休" },
+    "2027-05-08": { kind: "work", name: "补班" },
+    "2027-06-09": { kind: "off", name: "端午节" },
+    "2027-09-15": { kind: "off", name: "中秋节" },
+    "2027-09-26": { kind: "work", name: "补班" },
+    "2027-10-01": { kind: "off", name: "国庆节" },
+    "2027-10-02": { kind: "off", name: "国庆休" },
+    "2027-10-03": { kind: "off", name: "国庆休" },
+    "2027-10-04": { kind: "off", name: "国庆休" },
+    "2027-10-05": { kind: "off", name: "国庆休" },
+    "2027-10-06": { kind: "off", name: "国庆休" },
+    "2027-10-07": { kind: "off", name: "国庆休" },
+    "2027-10-09": { kind: "work", name: "补班" },
+  };
+
+  const FIXED_FESTIVALS_MD = {
+    "02-14": "情人节",
+    "03-08": "妇女节",
+    "05-04": "青年节",
+    "06-01": "儿童节",
+    "07-01": "建党节",
+    "08-01": "建军节",
+    "09-10": "教师节",
+    "11-11": "双11",
+    "12-24": "平安夜",
+    "12-25": "圣诞节",
+  };
+
+  const YEARLY_FESTIVALS = {
+    "2026-01-26": "腊八节",
+    "2026-03-03": "元宵节",
+    "2026-05-10": "母亲节",
+    "2026-06-21": "父亲节",
+    "2026-08-19": "七夕节",
+    "2026-10-18": "重阳节",
+    "2027-01-15": "腊八节",
+    "2027-02-20": "元宵节",
+    "2027-05-09": "母亲节",
+    "2027-06-20": "父亲节",
+    "2027-08-08": "七夕节",
+    "2027-10-19": "重阳节",
+  };
+
+  function getDateHolidayInfo(dateKey) {
+    const stat = CHINA_STATUTORY_HOLIDAYS[dateKey] || null;
+    const fest = YEARLY_FESTIVALS[dateKey] || FIXED_FESTIVALS_MD[dateKey.slice(5)] || "";
+    return { stat, fest };
+  }
+
+  function renderHolidayBadges(dateKey) {
+    const { stat, fest } = getDateHolidayInfo(dateKey);
+    let html = "";
+    if (stat) {
+      const cls = stat.kind === "off" ? "holiday-off" : "holiday-work";
+      const label = stat.kind === "off"
+        ? (stat.name.endsWith("休") ? "休" : `休·${stat.name}`)
+        : "班";
+      html += `<span class="holiday-tag ${cls}" title="${escapeHtml(stat.name)}">${escapeHtml(label)}</span>`;
+    }
+    if (fest) {
+      html += `<span class="holiday-tag holiday-festival" title="${escapeHtml(fest)}">${escapeHtml(fest)}</span>`;
+    }
+    return html;
+  }
+
   const state = {
     encryptedEnvelope: null,
     isEncryptedMode: false,
     activePassword: "",
+    liveSync: null,
     meta: {},
     events: [],
     view: "month",
@@ -137,6 +267,7 @@
   function showAppWithData(data) {
     state.meta = data.meta || {};
     state.events = data.events || [];
+    state.liveSync = data.liveSync || null;
     document.getElementById("lockScreen").classList.add("hidden");
     document.getElementById("appShell").classList.remove("hidden");
 
@@ -149,6 +280,16 @@
     populateFilterControls();
     alignInitialPeriod(state.events);
     render();
+    scrollToTodayCell(false);
+  }
+
+  function scrollToTodayCell(smooth = true) {
+    requestAnimationFrame(() => {
+      const todayEl = document.querySelector("[data-is-today='true']");
+      if (todayEl) {
+        todayEl.scrollIntoView({ behavior: smooth ? "smooth" : "instant", block: "center" });
+      }
+    });
   }
 
   // ---- Theme ----
@@ -408,11 +549,18 @@
       const inMonth = d.getMonth() === state.month;
       const list = byDate[key] || [];
       const hasConflict = list.some((e) => e.isConflict);
+      const isToday = key === todayKey;
+      const hInfo = getDateHolidayInfo(key);
+      const holidayOffCls = hInfo.stat && hInfo.stat.kind === "off" ? "is-holiday-off" : "";
 
       cells.push(`
-        <div class="day-cell ${inMonth ? "" : "outside"} ${key === todayKey ? "today" : ""}">
+        <div class="day-cell ${inMonth ? "" : "outside"} ${isToday ? "today" : ""} ${holidayOffCls}" ${isToday ? 'data-is-today="true"' : ""}>
           <div class="day-head">
-            <span class="day-num">${d.getDate() === 1 ? `${d.getMonth() + 1}月1日` : d.getDate()}</span>
+            <div class="day-head-left">
+              <span class="day-num">${d.getDate() === 1 ? `${d.getMonth() + 1}月1日` : d.getDate()}</span>
+              ${isToday ? `<span class="today-badge">今天</span>` : ""}
+              ${renderHolidayBadges(key)}
+            </div>
             ${list.length ? `<span class="day-count ${hasConflict ? "has-conflict" : ""}">${list.length}场</span>` : ""}
           </div>
           <div class="day-events">
@@ -457,8 +605,20 @@
       return days.some((d) => (map[`__${formatDateKey(d)}`] || []).length > 0);
     });
 
+    const todayKey = formatDateKey(new Date());
     const headCols = days
-      .map((d, i) => `<th><div>${WEEKDAYS[i]}</div><div style="font-weight:400;color:var(--text-muted);font-variant-numeric:tabular-nums;">${d.getMonth() + 1}月${d.getDate()}日</div></th>`)
+      .map((d, i) => {
+        const key = formatDateKey(d);
+        const isToday = key === todayKey;
+        return `<th ${isToday ? 'data-is-today="true" style="background:var(--primary-soft);"' : ""}>
+          <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
+            <span>${WEEKDAYS[i]}</span>
+            ${isToday ? `<span class="today-badge">今天</span>` : ""}
+            ${renderHolidayBadges(key)}
+          </div>
+          <div style="font-weight:400;color:var(--text-muted);font-variant-numeric:tabular-nums;">${d.getMonth() + 1}月${d.getDate()}日</div>
+        </th>`;
+      })
       .join("");
 
     const bodyRows = visibleStudios
@@ -513,15 +673,18 @@
     document.getElementById("calendarRoot").innerHTML = Object.entries(groups)
       .map(([dateStr, items]) => {
         let label = dateStr;
+        let badgesHtml = "";
+        const todayKey = formatDateKey(new Date());
         if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
           const [y, m, d] = dateStr.split("-").map(Number);
           const dtObj = new Date(y, m - 1, d);
           label = `${dateStr} · ${WEEKDAYS[(dtObj.getDay() + 6) % 7]}`;
+          badgesHtml = `${dateStr === todayKey ? '<span class="today-badge">今天</span>' : ""}${renderHolidayBadges(dateStr)}`;
         }
         return `
-          <div class="agenda-group">
+          <div class="agenda-group" ${dateStr === todayKey ? 'data-is-today="true"' : ""}>
             <div class="agenda-date-bar">
-              <span>${escapeHtml(label)}</span>
+              <span style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;">${escapeHtml(label)} ${badgesHtml}</span>
               <span style="font-weight:400;color:var(--text-muted);">${items.length} 场直播</span>
             </div>
             ${items
@@ -887,6 +1050,7 @@
       state.month = now.getMonth();
       state.weekStart = getMonday(now);
       render();
+      scrollToTodayCell(true);
     });
 
     document.getElementById("searchInput").addEventListener("input", (e) => { state.search = e.target.value; render(); });
@@ -941,67 +1105,146 @@
     });
   }
 
+  async function fetchAndApplyLatest(prevSyncedAt, prevHash) {
+    const res = await fetch(`./data/schedule.enc.json?t=${Date.now()}`, { cache: "no-store" });
+    if (res.ok) {
+      const envelope = await res.json();
+      if (envelope && envelope.encrypted) {
+        state.encryptedEnvelope = envelope;
+        state.isEncryptedMode = true;
+        const pw = state.activePassword || localStorage.getItem(PASS_STORAGE_KEY) || "";
+        if (!pw) {
+          showLockScreen("请输入访问密码以加载最新排期");
+          return { ok: false };
+        }
+        let data;
+        try {
+          data = await decryptEnvelope(envelope, pw);
+        } catch {
+          localStorage.removeItem(PASS_STORAGE_KEY);
+          state.activePassword = "";
+          showLockScreen("团队访问密码已更新，请重新输入新密码");
+          return { ok: false };
+        }
+        state.meta = data.meta || {};
+        state.events = data.events || [];
+        state.liveSync = data.liveSync || state.liveSync || null;
+        updateHeaderMeta();
+        populateFilterControls();
+        render();
+        const changed = (state.meta.contentHash && state.meta.contentHash !== prevHash) ||
+                        (state.meta.syncedAt && state.meta.syncedAt !== prevSyncedAt);
+        return { ok: true, changed };
+      }
+    }
+    const resPlain = await fetch(`./data/schedule.json?t=${Date.now()}`, { cache: "no-store" });
+    if (resPlain.ok) {
+      const data = await resPlain.json();
+      state.meta = data.meta || {};
+      state.events = data.events || [];
+      updateHeaderMeta();
+      populateFilterControls();
+      render();
+      return { ok: true, changed: true };
+    }
+    return { ok: false };
+  }
+
+  async function triggerLiveDingTalkSync(label) {
+    const cfg = state.liveSync;
+    if (!cfg || !cfg.token || !cfg.repo) return { triggered: false };
+
+    const apiBase = `https://api.github.com/repos/${cfg.repo}/actions/workflows/${cfg.workflow || "sync-calendar.yml"}`;
+    const headers = {
+      Authorization: `Bearer ${cfg.token}`,
+      Accept: "application/vnd.github+json",
+      "Content-Type": "application/json",
+    };
+
+    const startedAt = Date.now();
+    const dispRes = await fetch(`${apiBase}/dispatches`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ ref: cfg.ref || "main" }),
+    });
+    if (!dispRes.ok) {
+      throw new Error(`触发钉钉同步失败 (HTTP ${dispRes.status})`);
+    }
+
+    if (label) label.textContent = "同步钉钉中…";
+    showToast("已触发实时拉取钉钉三张表，预计 35–50 秒自动刷新…");
+
+    // Poll workflow run status until completed (max 120s)
+    const deadline = Date.now() + 120000;
+    let runId = null;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 4000));
+      const elapsed = Math.round((Date.now() - startedAt) / 1000);
+      const runsRes = await fetch(`${apiBase}/runs?per_page=5&t=${Date.now()}`, { headers, cache: "no-store" });
+      if (!runsRes.ok) continue;
+      const runsData = await runsRes.json();
+      const runs = runsData.workflow_runs || [];
+      const target = runId
+        ? runs.find((r) => r.id === runId)
+        : runs.find((r) => r.event === "workflow_dispatch" && new Date(r.created_at).getTime() >= startedAt - 15000);
+      if (target) {
+        runId = target.id;
+        if (target.status === "completed") {
+          if (target.conclusion !== "success") {
+            throw new Error(`钉钉同步任务异常结束 (${target.conclusion})`);
+          }
+          if (label) label.textContent = "加载最新数据…";
+          await new Promise((r) => setTimeout(r, 2500));
+          return { triggered: true, completed: true };
+        }
+        if (label) {
+          label.textContent = target.status === "queued" ? `排队同步 ${elapsed}s` : `拉取钉钉中 ${elapsed}s`;
+        }
+      } else if (label) {
+        label.textContent = `启动同步 ${elapsed}s`;
+      }
+    }
+    return { triggered: true, completed: false };
+  }
+
   async function refreshLatestData() {
     const btn = document.getElementById("refreshBtn");
     const label = document.getElementById("refreshBtnLabel");
     if (!btn || btn.disabled) return;
     btn.disabled = true;
     btn.classList.add("spinning");
-    if (label) label.textContent = "刷新中…";
+    if (label) label.textContent = "连接中…";
 
     const prevSyncedAt = state.meta.syncedAt || "";
     const prevHash = state.meta.contentHash || "";
     try {
-      const res = await fetch(`./data/schedule.enc.json?t=${Date.now()}`, { cache: "no-store" });
-      if (res.ok) {
-        const envelope = await res.json();
-        if (envelope && envelope.encrypted) {
-          state.encryptedEnvelope = envelope;
-          state.isEncryptedMode = true;
-          const pw = state.activePassword || localStorage.getItem(PASS_STORAGE_KEY) || "";
-          if (!pw) {
-            showLockScreen("请输入访问密码以加载最新排期");
-            return;
-          }
-          let data;
-          try {
-            data = await decryptEnvelope(envelope, pw);
-          } catch {
-            localStorage.removeItem(PASS_STORAGE_KEY);
-            state.activePassword = "";
-            showLockScreen("团队访问密码已更新，请重新输入新密码");
-            return;
-          }
-          // Preserve current month/week & filter selections while refreshing data
-          state.meta = data.meta || {};
-          state.events = data.events || [];
-          updateHeaderMeta();
-          populateFilterControls();
-          render();
-          const changed = (state.meta.contentHash && state.meta.contentHash !== prevHash) ||
-                          (state.meta.syncedAt && state.meta.syncedAt !== prevSyncedAt);
+      if (state.liveSync && state.liveSync.token) {
+        const syncResult = await triggerLiveDingTalkSync(label);
+        const pull = await fetchAndApplyLatest(prevSyncedAt, prevHash);
+        if (pull.ok) {
           showToast(
-            changed
+            pull.changed
+              ? `已从钉钉实时拉取最新排期！（共 ${state.events.length} 场 · ${state.meta.syncedAt || ""}）`
+              : syncResult.completed
+                ? `钉钉三表已核对完成，当前排期无新改动（${state.events.length} 场）`
+                : "钉钉后台仍在同步中，请 10 秒后再点刷新查看"
+          );
+          return;
+        }
+      } else {
+        const pull = await fetchAndApplyLatest(prevSyncedAt, prevHash);
+        if (pull.ok) {
+          showToast(
+            pull.changed
               ? `已更新最新排期（共 ${state.events.length} 场 · ${state.meta.syncedAt || ""}）`
-              : `当前已是最新数据（上次同步：${state.meta.syncedAt || "--"}）`
+              : `当前已是最新已发布数据（上次同步：${state.meta.syncedAt || "--"}）`
           );
           return;
         }
       }
-      const resPlain = await fetch(`./data/schedule.json?t=${Date.now()}`, { cache: "no-store" });
-      if (resPlain.ok) {
-        const data = await resPlain.json();
-        state.meta = data.meta || {};
-        state.events = data.events || [];
-        updateHeaderMeta();
-        populateFilterControls();
-        render();
-        showToast(`已刷新排期数据（共 ${state.events.length} 场）`);
-        return;
-      }
       showToast("刷新失败：未获取到远端排期文件");
-    } catch {
-      showToast("网络异常，请稍后重试刷新");
+    } catch (err) {
+      showToast(err && err.message ? err.message : "网络异常，请稍后重试刷新");
     } finally {
       btn.disabled = false;
       btn.classList.remove("spinning");
