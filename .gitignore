@@ -2,3 +2,9 @@
 __pycache__/
 *.pyc
 .DS_Store
+
+# 加密模式下避免把明文排期文件意外提交到公开仓库
+data/schedule.csv
+docs/data/schedule.json
+docs/data/schedule-data.js
+docs/calendar.ics
