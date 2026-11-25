@@ -123,6 +123,24 @@ def get_dingtalk_access_token(app_key: str, app_secret: str) -> str:
     return token
 
 
+def resolve_union_id_by_userid(access_token: str, userid: str) -> str:
+    """Resolve unionId from DingTalk staffId/userid via Contacts API (requires Contact.User.Read)."""
+    q = urllib.parse.urlencode({"access_token": access_token})
+    user_info = http_json(
+        "POST",
+        f"https://oapi.dingtalk.com/topapi/v2/user/get?{q}",
+        payload={"userid": userid},
+    )
+    if user_info.get("errcode", 0) != 0:
+        raise RuntimeError(
+            f"通过 userid({userid}) 查询 unionid 失败（请确认已开通“通讯录个人信息读权限”且审批通过，或直接填写 DINGTALK_OPERATOR_ID）: {user_info}"
+        )
+    union_id = (user_info.get("result") or {}).get("unionid")
+    if not union_id:
+        raise RuntimeError(f"成员详情中未返回 unionid: {user_info}")
+    return union_id
+
+
 def resolve_union_id_by_mobile(access_token: str, mobile: str) -> str:
     """Resolve unionId from phone number via DingTalk Contacts API."""
     q = urllib.parse.urlencode({"access_token": access_token})
@@ -138,18 +156,7 @@ def resolve_union_id_by_mobile(access_token: str, mobile: str) -> str:
     userid = (by_mobile.get("result") or {}).get("userid")
     if not userid:
         raise RuntimeError(f"未找到手机号 {mobile} 对应的钉钉成员: {by_mobile}")
-
-    user_info = http_json(
-        "POST",
-        f"https://oapi.dingtalk.com/topapi/v2/user/get?{q}",
-        payload={"userid": userid},
-    )
-    if user_info.get("errcode", 0) != 0:
-        raise RuntimeError(f"查询成员详情(unionid)失败: {user_info}")
-    union_id = (user_info.get("result") or {}).get("unionid")
-    if not union_id:
-        raise RuntimeError(f"成员详情中未返回 unionid: {user_info}")
-    return union_id
+    return resolve_union_id_by_userid(access_token, userid)
 
 
 def fetch_dingtalk_field_map(
@@ -716,16 +723,20 @@ def main() -> int:
     app_key = os.getenv("DINGTALK_APP_KEY", "").strip()
     app_secret = os.getenv("DINGTALK_APP_SECRET", "").strip()
     operator_id = os.getenv("DINGTALK_OPERATOR_ID", "").strip()
+    user_id = os.getenv("DINGTALK_USER_ID", "").strip()
     mobile = os.getenv("DINGTALK_MOBILE", "").strip()
     base_id = os.getenv("DINGTALK_BASE_ID", DEFAULT_BASE_ID).strip() or DEFAULT_BASE_ID
     sheet_id = os.getenv("DINGTALK_SHEET_ID", DEFAULT_SHEET_ID).strip() or DEFAULT_SHEET_ID
 
-    use_api = args.csv is None and bool(app_key and app_secret and (operator_id or mobile))
+    use_api = args.csv is None and bool(app_key and app_secret and (operator_id or user_id or mobile))
 
     if use_api:
         print(f"[info] 正在连接钉钉 AI 表格 API (baseId={base_id}, sheetId={sheet_id})...")
         token = get_dingtalk_access_token(app_key, app_secret)
-        if not operator_id and mobile:
+        if not operator_id and user_id:
+            print(f"[info] 正在通过 userid({user_id}) 查询操作人 unionId...")
+            operator_id = resolve_union_id_by_userid(token, user_id)
+        elif not operator_id and mobile:
             print(f"[info] 正在通过手机号查询操作人 unionId...")
             operator_id = resolve_union_id_by_mobile(token, mobile)
         raw_rows = fetch_dingtalk_records(token, base_id, sheet_id, operator_id)
