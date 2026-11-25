@@ -40,26 +40,21 @@
 
   <!-- Main Calendar App (hidden until unlocked in encrypted mode) -->
   <div id="appShell" class="app-shell hidden">
-    <!-- Top Bar -->
+    <!-- Compact Top Bar -->
     <header class="card topbar">
-      <div>
-        <div class="brand-row">
-          <h1 class="brand-title">直播排期日历看板</h1>
-          <span id="syncBadge" class="pill success">加载中…</span>
-          <span id="syncTimeBadge" class="pill">同步时间：--</span>
-          <span id="encBadge" class="pill success hidden">🔒 AES-256 已加密</span>
-          <button id="refreshBtn" class="btn btn-compact" type="button" title="拉取最新同步的排期数据">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <polyline points="23 4 23 10 17 10"></polyline>
-              <polyline points="1 20 1 14 7 14"></polyline>
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-            </svg>
-            <span id="refreshBtnLabel">刷新</span>
-          </button>
-        </div>
-        <p class="brand-sub">
-          核心信息一目了然：时间段 · 主题 · 19楼 / 21楼并行直播间 · 讲师 / 主持 / 运营 · 邀约状态 · 自动冲突预警
-        </p>
+      <div class="brand-row">
+        <h1 class="brand-title">直播排期日历看板</h1>
+        <span id="syncBadge" class="pill success">加载中…</span>
+        <span id="syncTimeBadge" class="pill">同步时间：--</span>
+        <span id="encBadge" class="pill success hidden">🔒 AES-256 已加密</span>
+        <button id="refreshBtn" class="btn btn-compact" type="button" title="实时拉取钉钉三张表最新排期">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+          <span id="refreshBtnLabel">刷新</span>
+        </button>
       </div>
 
       <div class="action-group">
@@ -77,26 +72,16 @@
       </div>
     </header>
 
-    <!-- Controls & Filters -->
+    <!-- Compact Controls & Filters (no redundant pagination bar — scroll smoothly across all months) -->
     <section class="card controls">
-      <div class="controls-top">
+      <div class="filters-row">
         <div class="segmented" role="tablist" aria-label="视图切换">
           <button type="button" class="seg-btn active" data-view="month">月历总览</button>
           <button type="button" class="seg-btn" data-view="week">周 · 直播间并行</button>
           <button type="button" class="seg-btn" data-view="agenda">日程列表 / 排查</button>
         </div>
 
-        <div class="nav-bar">
-          <button id="prevBtn" class="btn" type="button">← 上一周期</button>
-          <div id="periodTitle" class="period-title">--</div>
-          <button id="nextBtn" class="btn" type="button">下一周期 →</button>
-          <button id="todayBtn" class="btn btn-ghost" type="button">回到今天</button>
-          <span id="quickMonths"></span>
-        </div>
-      </div>
-
-      <div class="filters-row">
-        <input id="searchInput" class="input search-input" type="search" placeholder="搜索主题 / 讲师 / 主持 / 运营 / 视频号 / APP…" />
+        <input id="searchInput" class="input search-input" type="search" placeholder="搜索主题 / 讲师 / 主持 / 运营 / 账号…" />
 
         <select id="roomFilter" class="select">
           <option value="">全部直播间</option>
@@ -131,14 +116,14 @@
     <!-- Undated Events Alert Banner -->
     <section id="anomalyBanner" class="card anomaly-banner hidden"></section>
 
-    <!-- Calendar View Container -->
+    <!-- Continuous Multi-Month Calendar Container -->
     <main id="calendarRoot" class="card calendar-shell"></main>
 
-    <!-- KPI Summary (placed below calendar so the schedule table stays unobstructed) -->
+    <!-- KPI Summary (below calendar so schedule table stays unobstructed) -->
     <section class="kpi-grid" id="kpiBar"></section>
 
     <footer class="footer-note">
-      由 GitHub Actions 自动同步并加密发布 · 本机解锁后自动记住密码，下次直接查看
+      由 GitHub Actions 自动同步并加密发布 · 滚轮上下滑直接浏览全部月份
     </footer>
   </div>
 
