@@ -159,10 +159,10 @@ def resolve_union_id_by_mobile(access_token: str, mobile: str) -> str:
     return resolve_union_id_by_userid(access_token, userid)
 
 
-def fetch_dingtalk_field_map(
+def fetch_dingtalk_fields(
     access_token: str, base_id: str, sheet_id: str, operator_id: str
-) -> Dict[str, str]:
-    """Fetch fieldId -> fieldName map so records keyed by either id or name work."""
+) -> List[Dict[str, Any]]:
+    """Fetch field definitions for a DingTalk AI Table sheet."""
     q = urllib.parse.urlencode({"operatorId": operator_id})
     url = f"https://api.dingtalk.com/v1.0/notable/bases/{base_id}/sheets/{sheet_id}/fields?{q}"
     try:
@@ -172,27 +172,38 @@ def fetch_dingtalk_field_map(
             headers={"x-acs-dingtalk-access-token": access_token},
         )
     except Exception as exc:
-        print(f"[warn] 获取字段列表失败（将继续按字段名解析）: {exc}", file=sys.stderr)
-        return {}
-    mapping: Dict[str, str] = {}
-    for item in res.get("value") or res.get("fields") or []:
-        fid = item.get("id")
-        fname = item.get("name")
-        if fid and fname:
-            mapping[str(fid)] = str(fname)
-    return mapping
+        print(f"[warn] 获取字段列表失败 (sheet={sheet_id}): {exc}", file=sys.stderr)
+        return []
+    return list(res.get("value") or res.get("fields") or [])
 
 
-def fetch_dingtalk_records(
+def fetch_dingtalk_sheets(
+    access_token: str, base_id: str, operator_id: str
+) -> List[Dict[str, Any]]:
+    """List all sheets in a DingTalk AI Table base."""
+    q = urllib.parse.urlencode({"operatorId": operator_id})
+    url = f"https://api.dingtalk.com/v1.0/notable/bases/{base_id}/sheets?{q}"
+    try:
+        res = http_json(
+            "GET",
+            url,
+            headers={"x-acs-dingtalk-access-token": access_token},
+        )
+    except Exception as exc:
+        print(f"[warn] 获取工作表列表失败: {exc}", file=sys.stderr)
+        return []
+    return list(res.get("value") or res.get("sheets") or [])
+
+
+def _fetch_raw_sheet_records(
     access_token: str, base_id: str, sheet_id: str, operator_id: str
 ) -> List[Dict[str, Any]]:
-    """Fetch all records from a DingTalk AI Table sheet with pagination."""
-    field_map = fetch_dingtalk_field_map(access_token, base_id, sheet_id, operator_id)
+    """Fetch raw record objects (id + fields) for a single sheet with pagination."""
     q = urllib.parse.urlencode({"operatorId": operator_id})
     url = f"https://api.dingtalk.com/v1.0/notable/bases/{base_id}/sheets/{sheet_id}/records/list?{q}"
     headers = {"x-acs-dingtalk-access-token": access_token}
 
-    all_rows: List[Dict[str, Any]] = []
+    records_out: List[Dict[str, Any]] = []
     next_token = ""
     while True:
         body: Dict[str, Any] = {"maxResults": 100}
@@ -200,18 +211,186 @@ def fetch_dingtalk_records(
             body["nextToken"] = next_token
         res = http_json("POST", url, headers=headers, payload=body)
         records = res.get("records") or []
-        for rec in records:
-            raw_fields = rec.get("fields") or {}
-            normalized: Dict[str, Any] = {"_recordId": rec.get("id", "")}
-            for k, v in raw_fields.items():
-                name = field_map.get(k, k)
-                normalized[name] = v
-            all_rows.append(normalized)
+        records_out.extend(records)
 
         has_more = bool(res.get("hasMore"))
         next_token = str(res.get("nextToken") or "")
         if not has_more or not next_token:
             break
+    return records_out
+
+
+def _extract_linked_ids(val: Any, is_link_field: bool = False) -> List[str]:
+    """Extract linked record IDs from DingTalk unidirectionalLink / bidirectionalLink values."""
+    if val is None:
+        return []
+    if isinstance(val, dict):
+        for key in ("linkedRecordIds", "recordIds"):
+            ids = val.get(key)
+            if isinstance(ids, list):
+                return [str(x) for x in ids if x]
+        # Single linked record object without display text
+        if ("recordId" in val or "id" in val) and not any(
+            val.get(k) for k in ("name", "text", "primaryValue", "label", "title")
+        ):
+            rid = val.get("recordId") or val.get("id")
+            return [str(rid)] if rid else []
+    if isinstance(val, list):
+        out: List[str] = []
+        for item in val:
+            if isinstance(item, str) and is_link_field:
+                out.append(item)
+            elif isinstance(item, dict):
+                if any(item.get(k) for k in ("name", "text", "primaryValue", "label", "title")):
+                    continue
+                rid = item.get("recordId") or item.get("id")
+                if rid:
+                    out.append(str(rid))
+        return out
+    return []
+
+
+def _pick_primary_display(fields_dict: Dict[str, Any], sheet_fields: List[Dict[str, Any]]) -> str:
+    """Pick the primary display label of a linked lookup record (e.g. 名称/账号名称/姓名)."""
+    field_id_to_name = {
+        str(f.get("id")): str(f.get("name"))
+        for f in sheet_fields
+        if f.get("id") and f.get("name")
+    }
+    named: Dict[str, Any] = {}
+    for k, v in fields_dict.items():
+        named[field_id_to_name.get(str(k), str(k))] = v
+
+    # 1. Explicit primary field from schema
+    for f in sheet_fields:
+        if f.get("isPrimary") or f.get("primary"):
+            fname = str(f.get("name") or "")
+            if fname in named:
+                txt = extract_text(named[fname])
+                if txt:
+                    return txt
+
+    # 2. Well-known primary column names in DingTalk lookup sheets
+    for preferred in ("名称", "账号名称", "姓名", "直播间", "标题", "主题"):
+        if preferred in named:
+            txt = extract_text(named[preferred])
+            if txt:
+                return txt
+
+    # 3. First defined field in schema
+    if sheet_fields:
+        first_name = str(sheet_fields[0].get("name") or "")
+        if first_name in named:
+            txt = extract_text(named[first_name])
+            if txt:
+                return txt
+
+    # 4. First non-empty scalar text field
+    for v in named.values():
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+    return ""
+
+
+def resolve_linked_records_in_rows(
+    rows: List[Dict[str, Any]],
+    record_lookup: Dict[str, str],
+    link_field_names: Optional[set] = None,
+) -> int:
+    """Replace linkedRecordIds objects in normalized rows with human-readable display labels."""
+    link_names = link_field_names or set()
+    resolved_cells = 0
+    for row in rows:
+        for k, v in list(row.items()):
+            if k.startswith("_"):
+                continue
+            ids = _extract_linked_ids(v, is_link_field=(k in link_names))
+            if not ids:
+                continue
+            labels = [record_lookup.get(rid, "") for rid in ids]
+            labels = [lb for lb in labels if lb]
+            if labels:
+                # Deduplicate preserving order
+                deduped = list(dict.fromkeys(labels))
+                row[k] = "、".join(deduped)
+                resolved_cells += 1
+    return resolved_cells
+
+
+def fetch_dingtalk_records(
+    access_token: str, base_id: str, sheet_id: str, operator_id: str
+) -> List[Dict[str, Any]]:
+    """Fetch all records from a DingTalk AI Table sheet and resolve linked record fields."""
+    sheet_fields = fetch_dingtalk_fields(access_token, base_id, sheet_id, operator_id)
+    field_map: Dict[str, str] = {}
+    link_field_names: set = set()
+    linked_sheet_ids: List[str] = []
+
+    for f in sheet_fields:
+        fid = str(f.get("id") or "")
+        fname = str(f.get("name") or "")
+        ftype = str(f.get("type") or "")
+        if fid and fname:
+            field_map[fid] = fname
+        prop = f.get("property") or {}
+        if "link" in ftype.lower() or any(
+            k in prop for k in ("linkedSheetId", "targetSheetId", "sheetId", "linkedTableId")
+        ):
+            if fname:
+                link_field_names.add(fname)
+            if fid:
+                link_field_names.add(fid)
+            for key in ("linkedSheetId", "targetSheetId", "sheetId", "linkedTableId"):
+                sid = prop.get(key)
+                if sid and str(sid) != sheet_id and str(sid) not in linked_sheet_ids:
+                    linked_sheet_ids.append(str(sid))
+
+    raw_records = _fetch_raw_sheet_records(access_token, base_id, sheet_id, operator_id)
+    all_rows: List[Dict[str, Any]] = []
+    needs_lookup = False
+    for rec in raw_records:
+        raw_fields = rec.get("fields") or {}
+        normalized: Dict[str, Any] = {"_recordId": rec.get("id", "")}
+        for k, v in raw_fields.items():
+            name = field_map.get(str(k), str(k))
+            normalized[name] = v
+            if _extract_linked_ids(v, is_link_field=(name in link_field_names)):
+                needs_lookup = True
+        all_rows.append(normalized)
+
+    if needs_lookup:
+        if not linked_sheet_ids:
+            # Fallback: discover all other sheets in the base (e.g. 直播间/账号/讲师/主持人/运营)
+            for s in fetch_dingtalk_sheets(access_token, base_id, operator_id):
+                sid = str(s.get("id") or "")
+                if sid and sid != sheet_id and sid not in linked_sheet_ids:
+                    linked_sheet_ids.append(sid)
+
+        record_lookup: Dict[str, str] = {}
+        for lsid in linked_sheet_ids:
+            lfields = fetch_dingtalk_fields(access_token, base_id, lsid, operator_id)
+            lrecs = _fetch_raw_sheet_records(access_token, base_id, lsid, operator_id)
+            for lrec in lrecs:
+                rid = str(lrec.get("id") or "")
+                if not rid:
+                    continue
+                label = _pick_primary_display(lrec.get("fields") or {}, lfields)
+                if label:
+                    record_lookup[rid] = label
+
+        resolved_cells = resolve_linked_records_in_rows(all_rows, record_lookup, link_field_names)
+        print(
+            f"[info] 已解析 {len(linked_sheet_ids)} 张关联子表（{len(record_lookup)} 条映射），"
+            f"共填充 {resolved_cells} 个关联字段值"
+        )
+    elif all_rows:
+        sample = all_rows[0]
+        shape = {
+            k: (type(v).__name__, list(v.keys()) if isinstance(v, dict) else (type(v[0]).__name__ if isinstance(v, list) and v else ""))
+            for k, v in sample.items()
+            if k in ("直播间", "视频号账号", "APP账号", "讲师", "主持人", "运营")
+        }
+        print(f"[info] 未检测到需查表的关联 ID，样本字段结构: {shape}")
 
     return all_rows
 
