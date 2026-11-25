@@ -42,6 +42,7 @@ DEFAULT_BASE_ID = "MNDoBb60VLrYNqLqInx6PzPA8lemrZQ3"
 DEFAULT_SHEET_ID = "AEFsFrm"
 DEFAULT_PRO_WORKBOOK_ID = "EpGBa2Lm8azZ5n4nFwmY4KDkWgN7R35y"   # 专业课直播汇总表
 DEFAULT_GRID_WORKBOOK_ID = "2Amq4vjg89gjdp9pSmqQqAv5V3kdP0wQ"  # 咨询师之家直播时间表（新版）
+DEFAULT_SUPPLEMENT_START_DATE = "2026-11-01"                    # 补充表补录起始日期（涵盖 2026年11月 及之后）
 DEFAULT_SOURCE_URL = (
     "https://alidocs.dingtalk.com/i/nodes/MNDoBb60VLrYNqLqInx6PzPA8lemrZQ3"
     "?utm_scene=person_space&iframeQuery=viewId%3Dc9vuiLa%26sheetId%3DAEFsFrm"
@@ -559,15 +560,17 @@ def parse_pro_course_targets_grid(
                     col_map["time"] = idx
                 elif h in ("老师", "讲师"):
                     col_map["speaker"] = idx
-                elif "课程" in h:
+                elif "课程" in h and not any(x in h for x in ("负责", "运营", "助理", "对接")) and "course" not in col_map:
                     col_map["course"] = idx
+                elif any(x in h for x in ("运营", "负责")) and "ops" not in col_map:
+                    col_map["ops"] = idx
                 elif h == "类型":
                     col_map["salesType"] = idx
-                elif "目标" in h:
+                elif "目标" in h and "target" not in col_map:
                     col_map["target"] = idx
-                elif "状态" in h:
+                elif "状态" in h and "status" not in col_map:
                     col_map["status"] = idx
-                elif h in ("主持人", "主播"):
+                elif h in ("主持人", "主播") and "host" not in col_map:
                     col_map["host"] = idx
             continue
 
@@ -584,6 +587,7 @@ def parse_pro_course_targets_grid(
         start, end = _parse_time_range(cell("time"))
         speaker = cell("speaker")
         course = cell("course")
+        ops_val = cell("ops")
         sales_type = cell("salesType")
         target = cell("target")
         status = cell("status")
@@ -599,6 +603,7 @@ def parse_pro_course_targets_grid(
                 "end": end,
                 "speaker": speaker,
                 "coursePrice": course,
+                "ops": ops_val,
                 "salesType": sales_type,
                 "salesTarget": target,
                 "inviteStatus": status,
@@ -889,24 +894,185 @@ def _times_compatible(a_start: str, a_end: str, b_start: str, b_end: str) -> int
     return -100
 
 
+def _normalize_live_type(category: str, title_hint: str = "") -> str:
+    """Map supplementary grid category labels onto standard calendar live types."""
+    combined = f"{category} {title_hint}"
+    if any(k in combined for k in ("百场督导", "咨询观摩", "督导教学", "闭门会")):
+        return "百场督导咨询观摩"
+    if "伦理" in combined:
+        return "咨询伦理决策现场"
+    if "朝阳训练营" in combined or "低转高" in combined:
+        return "朝阳训练营"
+    if any(k in combined for k in ("朝阳", "初心咨询", "壹心理", "学员访谈")):
+        return "朝阳计划"
+    if "团督" in combined:
+        return "团督"
+    if "平台产品" in combined:
+        return "平台产品"
+    if any(k in combined for k in ("专业课", "高价课", "训练营")):
+        return "专业课"
+    return (category or "其他直播").strip()
+
+
+def _apply_grid_to_event(ev: Dict[str, Any], g: Dict[str, Any]) -> None:
+    if "咨询师之家直播时间表" not in ev["supplementSources"]:
+        ev["supplementSources"].append("咨询师之家直播时间表")
+    if not ev["speaker"] and g["speaker"]:
+        ev["speaker"] = g["speaker"]
+    if not ev["host"] and g["host"]:
+        ev["host"] = g["host"]
+    if g["stageControl"]:
+        ev["stageControl"] = g["stageControl"]
+        if not ev["ops"]:
+            ev["ops"] = g["stageControl"]
+    if g["streamPush"]:
+        ev["streamPush"] = g["streamPush"]
+    if not ev["room"] and g["room"]:
+        ev["room"] = g["room"]
+    if g["broadcastMode"]:
+        ev["broadcastMode"] = g["broadcastMode"]
+        if not ev["appAccount"] and ("APP" in g["broadcastMode"].upper() or "咨家" in g["broadcastMode"]):
+            if "仅视频号" not in g["broadcastMode"]:
+                ev["appAccount"] = "咨询师之家APP"
+        if not ev["videoAccount"] and "视频号" in g["broadcastMode"]:
+            ev["videoAccount"] = "咨询师之家"
+    if g["scheduleNote"]:
+        ev["scheduleNote"] = g["scheduleNote"]
+
+
+def _apply_pro_to_event(ev: Dict[str, Any], p: Dict[str, Any]) -> None:
+    if "专业课直播汇总表" not in ev["supplementSources"]:
+        ev["supplementSources"].append("专业课直播汇总表")
+    if not ev["speaker"] and p["speaker"]:
+        ev["speaker"] = p["speaker"]
+    if not ev["host"] and p["host"]:
+        ev["host"] = p["host"]
+    if not ev["ops"] and p.get("ops"):
+        ev["ops"] = p["ops"]
+    if p["coursePrice"]:
+        ev["coursePrice"] = p["coursePrice"]
+    if p["salesType"]:
+        ev["salesType"] = p["salesType"]
+    if p["salesTarget"]:
+        ev["salesTarget"] = p["salesTarget"]
+    if p["inviteStatus"] and (
+        not ev["inviteStatus"] or (ev["inviteStatus"] == "未邀约" and "已邀约" in p["inviteStatus"])
+    ):
+        ev["inviteStatus"] = "已邀约" if "已邀约" in p["inviteStatus"] else p["inviteStatus"]
+
+
+def _build_event_from_grid(g: Dict[str, Any], seq: int) -> Dict[str, Any]:
+    live_type = _normalize_live_type(g["category"], g["titleHint"])
+    title = (g["titleHint"] or "").strip()
+    if not title:
+        title = f"{live_type} · {g['speaker']}" if g["speaker"] else live_type
+    stable_key = f"grid|{g['date']}|{g['start']}|{g['end']}|{g['room']}|{title}|{g['speaker']}|{seq}"
+    uid = hashlib.md5(stable_key.encode("utf-8")).hexdigest()[:12]
+    ev: Dict[str, Any] = {
+        "id": uid,
+        "recordId": "",
+        "origin": "supplement",
+        "title": title,
+        "displayTitle": title,
+        "date": g["date"],
+        "type": live_type,
+        "start": g["start"],
+        "end": g["end"],
+        "videoAccount": "",
+        "appAccount": "",
+        "speaker": g["speaker"],
+        "host": g["host"],
+        "inviteStatus": "",
+        "ops": g["stageControl"],
+        "room": g["room"],
+        "detail": "",
+        "tableConflict": False,
+        "conflictReasons": [],
+        "anomalyReasons": [],
+        "isConflict": False,
+        "hasAnomaly": False,
+        "stageControl": "",
+        "streamPush": "",
+        "broadcastMode": "",
+        "coursePrice": "",
+        "salesType": "",
+        "salesTarget": "",
+        "scheduleNote": "",
+        "supplementSources": [],
+    }
+    _apply_grid_to_event(ev, g)
+    return ev
+
+
+def _build_event_from_pro(p: Dict[str, Any], seq: int) -> Dict[str, Any]:
+    title = (p["coursePrice"] or "").strip()
+    if title and p["speaker"] and p["speaker"] not in title:
+        title = f"专业课-{p['speaker']}·{title}"
+    elif not title:
+        title = f"专业课 · {p['speaker']}" if p["speaker"] else "专业课直播"
+    stable_key = f"pro|{p['date']}|{p['start']}|{p['end']}|{p['speaker']}|{title}|{seq}"
+    uid = hashlib.md5(stable_key.encode("utf-8")).hexdigest()[:12]
+    ev: Dict[str, Any] = {
+        "id": uid,
+        "recordId": "",
+        "origin": "supplement",
+        "title": title,
+        "displayTitle": title,
+        "date": p["date"],
+        "type": "专业课",
+        "start": p["start"],
+        "end": p["end"],
+        "videoAccount": "",
+        "appAccount": "",
+        "speaker": p["speaker"],
+        "host": p["host"],
+        "inviteStatus": "",
+        "ops": p.get("ops", ""),
+        "room": "",
+        "detail": "",
+        "tableConflict": False,
+        "conflictReasons": [],
+        "anomalyReasons": [],
+        "isConflict": False,
+        "hasAnomaly": False,
+        "stageControl": "",
+        "streamPush": "",
+        "broadcastMode": "",
+        "coursePrice": "",
+        "salesType": "",
+        "salesTarget": "",
+        "scheduleNote": "",
+        "supplementSources": [],
+    }
+    _apply_pro_to_event(ev, p)
+    return ev
+
+
 def merge_supplements(
     events: List[Dict[str, Any]],
     pro_rows: List[Dict[str, Any]],
     grid_rows: List[Dict[str, Any]],
-) -> Tuple[int, int]:
-    """Enrich main-table events with matched records from the 2 supplementary DingTalk workbooks."""
-    pro_by_date: Dict[str, List[Dict[str, Any]]] = {}
-    for r in pro_rows:
-        pro_by_date.setdefault(r["date"], []).append(r)
+    supplement_start_date: str = DEFAULT_SUPPLEMENT_START_DATE,
+) -> Tuple[int, int, int]:
+    """Enrich main-table events AND backfill missing sessions (>= supplement_start_date) from the 2 workbooks.
 
-    grid_by_date: Dict[str, List[Dict[str, Any]]] = {}
-    for r in grid_rows:
-        grid_by_date.setdefault(r["date"], []).append(r)
+    Returns: (enriched_from_pro, enriched_from_grid, backfilled_events)
+    """
+    pro_by_date: Dict[str, List[Tuple[int, Dict[str, Any]]]] = {}
+    for idx, r in enumerate(pro_rows):
+        pro_by_date.setdefault(r["date"], []).append((idx, r))
 
+    grid_by_date: Dict[str, List[Tuple[int, Dict[str, Any]]]] = {}
+    for idx, r in enumerate(grid_rows):
+        grid_by_date.setdefault(r["date"], []).append((idx, r))
+
+    used_grid_indices: set = set()
+    used_pro_indices: set = set()
     enriched_from_grid = 0
     enriched_from_pro = 0
 
     for ev in events:
+        ev.setdefault("origin", "main")
         ev.setdefault("stageControl", "")
         ev.setdefault("streamPush", "")
         ev.setdefault("broadcastMode", "")
@@ -920,9 +1086,12 @@ def merge_supplements(
             continue
 
         # 1. Match against Spreadsheet 2 (咨询师之家直播时间表)
+        best_grid_idx = None
         best_grid = None
         best_grid_score = 0
-        for cand in grid_by_date.get(ev["date"], []):
+        for g_idx, cand in grid_by_date.get(ev["date"], []):
+            if g_idx in used_grid_indices:
+                continue
             t_score = _times_compatible(ev["start"], ev["end"], cand["start"], cand["end"])
             if t_score < 0:
                 continue
@@ -938,42 +1107,24 @@ def merge_supplements(
             spk_bonus = 40 if (ev["speaker"] and cand["speaker"] and (ev["speaker"] in cand["speaker"] or cand["speaker"] in ev["speaker"])) else 0
             room_bonus = 10 if (ev["room"] and cand["room"] and ev["room"] == cand["room"]) else 0
             score = t_score + cat_score + kw_score + spk_bonus + room_bonus
-            # Require strong confidence: either time+cat/kw (>=55) or untimed cat+kw (>=50)
             threshold = 50 if not cand["start"] else 55
             if score >= threshold and score > best_grid_score:
                 best_grid_score = score
                 best_grid = cand
+                best_grid_idx = g_idx
 
-        if best_grid:
+        if best_grid is not None and best_grid_idx is not None:
+            used_grid_indices.add(best_grid_idx)
             enriched_from_grid += 1
-            if "咨询师之家直播时间表" not in ev["supplementSources"]:
-                ev["supplementSources"].append("咨询师之家直播时间表")
-            if not ev["speaker"] and best_grid["speaker"]:
-                ev["speaker"] = best_grid["speaker"]
-            if not ev["host"] and best_grid["host"]:
-                ev["host"] = best_grid["host"]
-            if best_grid["stageControl"]:
-                ev["stageControl"] = best_grid["stageControl"]
-                if not ev["ops"]:
-                    ev["ops"] = best_grid["stageControl"]
-            if best_grid["streamPush"]:
-                ev["streamPush"] = best_grid["streamPush"]
-            if not ev["room"] and best_grid["room"]:
-                ev["room"] = best_grid["room"]
-            if best_grid["broadcastMode"]:
-                ev["broadcastMode"] = best_grid["broadcastMode"]
-                if not ev["appAccount"] and ("APP" in best_grid["broadcastMode"].upper() or "咨家" in best_grid["broadcastMode"]):
-                    if "仅视频号" not in best_grid["broadcastMode"]:
-                        ev["appAccount"] = "咨询师之家APP"
-                if not ev["videoAccount"] and "视频号" in best_grid["broadcastMode"]:
-                    ev["videoAccount"] = "咨询师之家"
-            if best_grid["scheduleNote"]:
-                ev["scheduleNote"] = best_grid["scheduleNote"]
+            _apply_grid_to_event(ev, best_grid)
 
         # 2. Match against Spreadsheet 1 (专业课直播汇总表)
+        best_pro_idx = None
         best_pro = None
         best_pro_score = 0
-        for cand in pro_by_date.get(ev["date"], []):
+        for p_idx, cand in pro_by_date.get(ev["date"], []):
+            if p_idx in used_pro_indices:
+                continue
             t_score = _times_compatible(ev["start"], ev["end"], cand["start"], cand["end"])
             if t_score < 0:
                 continue
@@ -988,30 +1139,113 @@ def merge_supplements(
             if score >= 55 and score > best_pro_score:
                 best_pro_score = score
                 best_pro = cand
+                best_pro_idx = p_idx
 
-        if best_pro:
+        if best_pro is not None and best_pro_idx is not None:
+            used_pro_indices.add(best_pro_idx)
             enriched_from_pro += 1
-            if "专业课直播汇总表" not in ev["supplementSources"]:
-                ev["supplementSources"].append("专业课直播汇总表")
-            if not ev["speaker"] and best_pro["speaker"]:
-                ev["speaker"] = best_pro["speaker"]
-            if not ev["host"] and best_pro["host"]:
-                ev["host"] = best_pro["host"]
-            if best_pro["coursePrice"]:
-                ev["coursePrice"] = best_pro["coursePrice"]
-            if best_pro["salesType"]:
-                ev["salesType"] = best_pro["salesType"]
-            if best_pro["salesTarget"]:
-                ev["salesTarget"] = best_pro["salesTarget"]
-            if best_pro["inviteStatus"] and (not ev["inviteStatus"] or (ev["inviteStatus"] == "未邀约" and "已邀约" in best_pro["inviteStatus"])):
-                ev["inviteStatus"] = "已邀约" if "已邀约" in best_pro["inviteStatus"] else best_pro["inviteStatus"]
+            _apply_pro_to_event(ev, best_pro)
 
         # Recompute anomalies if room was filled in by supplement
         if ev["room"] and "未分配直播间" in ev["anomalyReasons"]:
             ev["anomalyReasons"] = [a for a in ev["anomalyReasons"] if a != "未分配直播间"]
         ev["hasAnomaly"] = bool(ev["anomalyReasons"]) or bool(ev["isConflict"])
 
-    return enriched_from_pro, enriched_from_grid
+    # 3. Backfill missing sessions (>= supplement_start_date, e.g. Nov 2026 & Jan 2027)
+    backfilled: List[Dict[str, Any]] = []
+    if supplement_start_date:
+        # First backfill from unmatched weekly grid rows, merging matching unmatched pro rows into them
+        for g_idx, g in enumerate(grid_rows):
+            if g_idx in used_grid_indices:
+                continue
+            if not g["date"] or g["date"] < supplement_start_date:
+                continue
+            # Skip obvious non-session placeholder notes (e.g. "待定", "休息", "节假日", "无")
+            hint = (g["titleHint"] or "").strip()
+            if not any([g["start"], g["speaker"], g["host"], g["room"], g["broadcastMode"]]) and len(hint) <= 4:
+                continue
+            new_ev = _build_event_from_grid(g, g_idx)
+
+            # Try enriching this backfilled grid event with an unmatched pro_row
+            best_p_idx = None
+            best_p = None
+            best_p_score = 0
+            for p_idx, cand in pro_by_date.get(new_ev["date"], []):
+                if p_idx in used_pro_indices:
+                    continue
+                t_score = _times_compatible(new_ev["start"], new_ev["end"], cand["start"], cand["end"])
+                if t_score < 0:
+                    continue
+                if new_ev["speaker"] and cand["speaker"] and new_ev["speaker"] not in cand["speaker"] and cand["speaker"] not in new_ev["speaker"]:
+                    continue
+                cat_score = _category_compatible(new_ev["type"], new_ev["displayTitle"], cand["category"], cand["coursePrice"])
+                if cat_score < 0:
+                    continue
+                kw_score = _keyword_overlap_score(new_ev["displayTitle"], cand["coursePrice"] + " " + cand["speaker"])
+                spk_bonus = 40 if (new_ev["speaker"] and cand["speaker"] and (new_ev["speaker"] in cand["speaker"] or cand["speaker"] in new_ev["speaker"])) else 0
+                score = t_score + cat_score + kw_score + spk_bonus
+                if score >= 50 and score > best_p_score:
+                    best_p_score = score
+                    best_p = cand
+                    best_p_idx = p_idx
+            if best_p is not None and best_p_idx is not None:
+                used_pro_indices.add(best_p_idx)
+                enriched_from_pro += 1
+                _apply_pro_to_event(new_ev, best_p)
+
+            backfilled.append(new_ev)
+
+        # Next backfill any remaining unmatched pro_rows >= supplement_start_date
+        for p_idx, p in enumerate(pro_rows):
+            if p_idx in used_pro_indices:
+                continue
+            if not p["date"] or p["date"] < supplement_start_date:
+                continue
+            backfilled.append(_build_event_from_pro(p, p_idx))
+
+    if backfilled:
+        events.extend(backfilled)
+        # Re-check room/videoAccount/host overlaps on dates that have backfilled sessions with explicit times
+        def _recheck(field_name: str, label: str) -> None:
+            buckets: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
+            for ev in events:
+                val = ev[field_name]
+                if not ev["date"] or not val or not ev["start"]:
+                    continue
+                norm_val = val.replace("(旧)", "")
+                buckets.setdefault((ev["date"], norm_val), []).append(ev)
+            for group in buckets.values():
+                if len(group) < 2:
+                    continue
+                for i in range(len(group)):
+                    for j in range(i + 1, len(group)):
+                        a, b = group[i], group[j]
+                        if a.get("origin") != "supplement" and b.get("origin") != "supplement":
+                            continue
+                        a_s, a_e = time_to_mins(a["start"]), time_to_mins(a["end"])
+                        b_s, b_e = time_to_mins(b["start"]), time_to_mins(b["end"])
+                        if a_s is None or b_s is None:
+                            continue
+                        a_end_m = a_e if (a_e is not None and a_e > a_s) else a_s + 60
+                        b_end_m = b_e if (b_e is not None and b_e > b_s) else b_s + 60
+                        if a_s < b_end_m and b_s < a_end_m:
+                            msg_a = f"与【{b['displayTitle']}】({b['start']}-{b['end']}) 时段重叠（相同{label}：{a[field_name]}）"
+                            msg_b = f"与【{a['displayTitle']}】({a['start']}-{a['end']}) 时段重叠（相同{label}：{b[field_name]}）"
+                            if not any(b["displayTitle"] in r and label in r for r in a["conflictReasons"]):
+                                a["conflictReasons"].append(msg_a)
+                            if not any(a["displayTitle"] in r and label in r for r in b["conflictReasons"]):
+                                b["conflictReasons"].append(msg_b)
+
+        _recheck("room", "直播间")
+        _recheck("videoAccount", "视频号账号")
+        _recheck("host", "主持人")
+        for ev in events:
+            ev["isConflict"] = bool(ev["conflictReasons"])
+            ev["hasAnomaly"] = bool(ev["anomalyReasons"]) or ev["isConflict"]
+
+        events.sort(key=lambda e: (e["date"] or "9999-99-99", e["start"] or "99:99", e["room"], e["displayTitle"]))
+
+    return enriched_from_pro, enriched_from_grid, len(backfilled)
 
 
 def fetch_supplementary_workbooks(
@@ -1613,13 +1847,17 @@ def main() -> int:
         source_mode = "csv-fallback" if args.csv is None else "csv-manual"
 
     events = build_events(raw_rows)
+    supplement_start = os.getenv("SUPPLEMENT_START_DATE", DEFAULT_SUPPLEMENT_START_DATE).strip()
     if pro_rows or grid_rows:
-        n_pro, n_grid = merge_supplements(events, pro_rows, grid_rows)
+        n_pro, n_grid, n_added = merge_supplements(
+            events, pro_rows, grid_rows, supplement_start_date=supplement_start
+        )
         print(
             f"[info] 三表合并完成：从「专业课直播汇总表」补充 {n_pro} 场，"
-            f"从「咨询师之家直播时间表」补充 {n_grid} 场"
+            f"从「咨询师之家直播时间表」补充 {n_grid} 场，"
+            f"补录主表缺失场次（>={supplement_start}）{n_added} 场"
         )
-        if n_pro > 0 or n_grid > 0:
+        if n_pro > 0 or n_grid > 0 or n_added > 0:
             source_mode = "dingtalk-3table"
     changed = write_outputs(
         events,
