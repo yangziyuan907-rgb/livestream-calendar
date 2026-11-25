@@ -544,6 +544,7 @@
 
     document.getElementById("modalBadges").innerHTML = `
       <span class="cat-badge cat-badge-${idx}">${escapeHtml(e.type || "未分类")}</span>
+      ${e.origin === "supplement" ? `<span class="pill">补充表补录</span>` : ""}
       ${e.salesType ? `<span class="pill">${escapeHtml(e.salesType)}</span>` : ""}
       ${e.inviteStatus ? `<span class="pill ${e.inviteStatus === "已邀约" ? "success" : "warning"}">${escapeHtml(e.inviteStatus)}</span>` : ""}
       ${e.isConflict ? `<span class="pill danger">时段冲突</span>` : ""}
