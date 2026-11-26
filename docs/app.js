@@ -155,6 +155,7 @@
     isEncryptedMode: false,
     activePassword: "",
     liveSync: null,
+    lastCheckedAt: "",
     meta: {},
     events: [],
     view: "month",
@@ -376,7 +377,12 @@
     const badge = document.getElementById("syncBadge");
     badge.textContent = `${modeMap[state.meta.sourceMode] || "已就绪"} · ${state.events.length} 场`;
     badge.className = `pill ${state.meta.sourceMode && state.meta.sourceMode.startsWith("dingtalk") ? "success" : "warning"}`;
-    document.getElementById("syncTimeBadge").textContent = `上次同步：${state.meta.syncedAt || "--"}`;
+    const timeBadge = document.getElementById("syncTimeBadge");
+    const displayTime = state.lastCheckedAt || state.meta.syncedAt || "--";
+    timeBadge.textContent = `最新同步：${displayTime}`;
+    timeBadge.title = state.meta.syncedAt
+      ? `最近核对：${displayTime} ｜ 数据最后变动：${state.meta.syncedAt}`
+      : "";
 
     const srcLink = document.getElementById("sourceLink");
     if (state.meta.sourceUrl) {
@@ -1082,7 +1088,24 @@
     });
   }
 
+  async function fetchLastCheckTime() {
+    try {
+      const res = await fetch(`./data/last-check.json?t=${Date.now()}`, { cache: "no-store" });
+      if (res.ok) {
+        const info = await res.json();
+        if (info && info.checkedAt) {
+          state.lastCheckedAt = info.checkedAt;
+          return info.checkedAt;
+        }
+      }
+    } catch {
+      // optional file
+    }
+    return "";
+  }
+
   async function fetchAndApplyLatest(prevSyncedAt, prevHash) {
+    await fetchLastCheckTime();
     const res = await fetch(`./data/schedule.enc.json?t=${Date.now()}`, { cache: "no-store" });
     if (res.ok) {
       const envelope = await res.json();
@@ -1138,6 +1161,19 @@
       "Content-Type": "application/json",
     };
 
+    // Record latest existing run ID before dispatching (avoids local clock-skew mismatch)
+    let prevLatestRunId = 0;
+    try {
+      const preRes = await fetch(`${apiBase}/runs?per_page=3&t=${Date.now()}`, { headers, cache: "no-store" });
+      if (preRes.ok) {
+        const preData = await preRes.json();
+        const preRuns = preData.workflow_runs || [];
+        if (preRuns.length) prevLatestRunId = preRuns[0].id || 0;
+      }
+    } catch {
+      // ignore pre-check error
+    }
+
     const startedAt = Date.now();
     const dispRes = await fetch(`${apiBase}/dispatches`, {
       method: "POST",
@@ -1149,10 +1185,10 @@
     }
 
     if (label) label.textContent = "同步钉钉中…";
-    showToast("已触发实时拉取钉钉三张表，预计 35–50 秒自动刷新…");
+    showToast("已触发实时拉取钉钉三张表，预计 40–60 秒自动更新…");
 
-    // Poll workflow run status until completed (max 120s)
-    const deadline = Date.now() + 120000;
+    // Poll workflow run status until completed (max 150s)
+    const deadline = Date.now() + 150000;
     let runId = null;
     while (Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 4000));
@@ -1163,7 +1199,10 @@
       const runs = runsData.workflow_runs || [];
       const target = runId
         ? runs.find((r) => r.id === runId)
-        : runs.find((r) => r.event === "workflow_dispatch" && new Date(r.created_at).getTime() >= startedAt - 15000);
+        : runs.find((r) =>
+            r.event === "workflow_dispatch" &&
+            (prevLatestRunId ? r.id > prevLatestRunId : new Date(r.created_at).getTime() >= startedAt - 60000)
+          );
       if (target) {
         runId = target.id;
         if (target.status === "completed") {
@@ -1171,7 +1210,6 @@
             throw new Error(`钉钉同步任务异常结束 (${target.conclusion})`);
           }
           if (label) label.textContent = "加载最新数据…";
-          await new Promise((r) => setTimeout(r, 2500));
           return { triggered: true, completed: true };
         }
         if (label) {
@@ -1184,6 +1222,20 @@
     return { triggered: true, completed: false };
   }
 
+  function formatNowShanghai() {
+    try {
+      const parts = new Intl.DateTimeFormat("sv-SE", {
+        timeZone: "Asia/Shanghai",
+        year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", second: "2-digit",
+        hour12: false,
+      }).format(new Date());
+      return parts.replace("T", " ");
+    } catch {
+      return new Date().toLocaleString("zh-CN");
+    }
+  }
+
   async function refreshLatestData() {
     const btn = document.getElementById("refreshBtn");
     const label = document.getElementById("refreshBtnLabel");
@@ -1194,16 +1246,29 @@
 
     const prevSyncedAt = state.meta.syncedAt || "";
     const prevHash = state.meta.contentHash || "";
+    const prevCheckedAt = state.lastCheckedAt || "";
     try {
       if (state.liveSync && state.liveSync.token) {
         const syncResult = await triggerLiveDingTalkSync(label);
-        const pull = await fetchAndApplyLatest(prevSyncedAt, prevHash);
+        // Retry up to 4 times (3s apart) to wait for GitHub Pages CDN propagation
+        let pull = { ok: false, changed: false };
+        for (let attempt = 0; attempt < 4; attempt++) {
+          await new Promise((r) => setTimeout(r, attempt === 0 ? 2500 : 3000));
+          pull = await fetchAndApplyLatest(prevSyncedAt, prevHash);
+          if (pull.ok && (pull.changed || (state.lastCheckedAt && state.lastCheckedAt !== prevCheckedAt))) {
+            break;
+          }
+        }
+        if (syncResult.completed && (!state.lastCheckedAt || state.lastCheckedAt === prevCheckedAt)) {
+          state.lastCheckedAt = formatNowShanghai();
+          updateHeaderMeta();
+        }
         if (pull.ok) {
           showToast(
             pull.changed
-              ? `已从钉钉实时拉取最新排期！（共 ${state.events.length} 场 · ${state.meta.syncedAt || ""}）`
+              ? `已从钉钉实时拉取最新排期！（共 ${state.events.length} 场 · ${state.lastCheckedAt || state.meta.syncedAt || ""}）`
               : syncResult.completed
-                ? `钉钉三表已核对完成，当前排期无新改动（${state.events.length} 场）`
+                ? `钉钉三表已实时核对完成（${state.lastCheckedAt}），当前暂无新改动`
                 : "钉钉后台仍在同步中，请 10 秒后再点刷新查看"
           );
           return;
@@ -1214,7 +1279,7 @@
           showToast(
             pull.changed
               ? `已更新最新排期（共 ${state.events.length} 场 · ${state.meta.syncedAt || ""}）`
-              : `当前已是最新已发布数据（上次同步：${state.meta.syncedAt || "--"}）`
+              : `当前已是最新已发布数据（上次同步：${state.lastCheckedAt || state.meta.syncedAt || "--"}）`
           );
           return;
         }
@@ -1230,6 +1295,7 @@
   }
 
   async function loadSchedule() {
+    await fetchLastCheckTime();
     // 1. Prefer AES-256-GCM encrypted payload (schedule.enc.json)
     try {
       const res = await fetch(`./data/schedule.enc.json?t=${Date.now()}`, { cache: "no-store" });
