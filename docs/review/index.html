@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>双平台直播复盘看板 · 团队加密分享版</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <!-- AES-256-GCM Lock Screen -->
+  <div id="lockScreen" class="lock-screen hidden">
+    <div class="lock-card">
+      <div class="lock-icon" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+      </div>
+      <div>
+        <h1 class="lock-title">双平台直播复盘看板</h1>
+        <p class="lock-desc">团队内部直播数据、商品明细、出单时间轴与逐字稿已启用 AES-256 端到端加密保护，请输入团队访问密码解锁查看。</p>
+      </div>
+      <form id="unlockForm" class="lock-form">
+        <div class="pw-wrap">
+          <input id="passwordInput" class="pw-input" type="password" placeholder="请输入团队访问密码" autocomplete="current-password" required />
+          <button id="togglePwBtn" class="pw-toggle" type="button">显示</button>
+        </div>
+        <label class="remember-row">
+          <input id="rememberPw" type="checkbox" checked />
+          <span>在此设备记住密码（下次打开直接查看）</span>
+        </label>
+        <div id="lockError" class="lock-error hidden"></div>
+        <button id="unlockBtn" class="btn btn-primary lock-submit" type="submit">解锁查看</button>
+      </form>
+      <div class="lock-foot">密码仅在本地浏览器解密使用，不会上传至第三方服务器；如已在本设备记住直播排期日历密码将自动免密解锁。</div>
+    </div>
+  </div>
+
+  <!-- Loading Splash -->
+  <div id="bootSplash" class="lock-screen">
+    <div class="lock-card" style="text-align:center;">
+      <div class="lock-icon" style="margin:0 auto;">🔐</div>
+      <h2 class="lock-title" style="font-size:17px;">正在加载加密复盘数据...</h2>
+      <p id="bootSplashHint" class="lock-desc">拉取 AES-256 加密数据包并在本地浏览器解密</p>
+    </div>
+  </div>
+
+  <!-- Main Read-Only Review Dashboard -->
+  <div id="appShell" class="hidden">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-logo">复</div>
+        <div>
+          <h1>
+            双平台直播复盘看板
+            <span class="ver-pill">🔒 AES-256 只读分享版</span>
+          </h1>
+          <p id="publishMetaLine">视频号 × MK后台 × 腾讯会议逐字稿 · 数据同步时间：--</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button id="btnAnalytics" class="btn btn-accent">📊 跨场次对比看板</button>
+        <a href="../" class="btn btn-outline" style="text-decoration:none;">📅 直播排期日历</a>
+        <button id="btnReloadData" class="btn btn-outline" title="拉取最新发布的加密复盘包">🔄 刷新</button>
+        <button id="btnLogout" class="btn btn-ghost" title="退出登录并清除本机记住的密码">退出</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <!-- Left Sidebar -->
+      <aside class="sidebar">
+        <div class="filter-tabs" id="blineTabs">
+          <button class="tab-pill active" data-bline="">全部有效</button>
+          <button class="tab-pill" data-bline="pro_course">专业课</button>
+          <button class="tab-pill" data-bline="group_supervision">团督</button>
+          <button class="tab-pill" data-bline="platform_live">平台直播</button>
+          <button class="tab-pill" data-bline="nurture">督导/观摩</button>
+        </div>
+        <div class="search-box">
+          <input id="searchInput" type="search" placeholder="搜索老师 / 主题 / 商品(品) / MK直播ID..." />
+          <div class="sidebar-quickbar">
+            <button id="btnJumpToday" class="btn btn-outline btn-xs">📍 回到今天</button>
+            <label class="inline-check" style="margin:0;font-size:11px;cursor:pointer;">
+              <input type="checkbox" id="chkOnlyLiveData" /> 仅看已播/有数据
+            </label>
+          </div>
+        </div>
+        <div id="sessionList" class="session-list">
+          <div class="empty-hint">加载中...</div>
+        </div>
+      </aside>
+
+      <!-- Main Detail Workspace -->
+      <section class="workspace" id="workspace">
+        <div id="emptyWorkspace" class="welcome-card">
+          <h2>双平台直播复盘看板（团队加密分享版）</h2>
+          <p>请从左侧选择任意一场直播，查看视频号与 MK 双平台指标、挂品明细、退单预警、延迟校准时间轴、AI 复盘结论与精确时间戳逐字稿。</p>
+        </div>
+
+        <div id="detailPanel" class="detail-panel hidden">
+          <div class="session-hero">
+            <div>
+              <div class="hero-tags" id="heroTags"></div>
+              <h2 id="heroTitle">-</h2>
+              <div class="hero-meta" id="heroMeta"></div>
+            </div>
+          </div>
+
+          <nav class="sub-tabs" id="detailTabs">
+            <button class="sub-tab active" data-tab="overview">1. 双平台数据与挂品</button>
+            <button class="sub-tab" data-tab="timeline">2. 延迟校准与出单/开讲时间轴</button>
+            <button class="sub-tab" data-tab="review">3. AI 自动复盘报告</button>
+            <button class="sub-tab" data-tab="materials">4. 逐字稿检索与订单明细</button>
+          </nav>
+
+          <!-- TAB 1: Dual-Platform Overview & Products -->
+          <div class="tab-pane" id="pane-overview">
+            <div id="nurtureBanner" class="banner-green hidden">
+              <strong>私域培育内容场（大咖督导 / 咨询观摩）：</strong>主看「在线人数、出勤率、完看率、互动讨论与老师核心干货/金句」，同时完整记录本场挂品与附带订单流水。
+            </div>
+
+            <div class="grid-2">
+              <div class="card">
+                <div class="card-head">
+                  <h3>视频号助手数据 <span class="tag tag-blue">微信视频号</span></h3>
+                </div>
+                <div id="chMetricsGrid" class="stat-grid-3"></div>
+                <div class="calc-bar" id="chCalcBar"></div>
+              </div>
+
+              <div class="card">
+                <div class="card-head">
+                  <h3>MK 后台 / APP 数据 <span class="tag tag-green">咨询师之家 APP</span></h3>
+                </div>
+                <div id="mkMetricsGrid" class="stat-grid-3"></div>
+                <div class="calc-bar" id="mkCalcBar"></div>
+                <div class="nurture-strip" id="mkNurtureStrip"></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head">
+                <h3>直播间商品明细（品） <span id="productsCountBadge" class="tag tag-purple">0 个品</span></h3>
+              </div>
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>平台</th>
+                      <th>商品名称（品）</th>
+                      <th>单价(¥)</th>
+                      <th>曝光</th>
+                      <th>点击</th>
+                      <th>成交单数</th>
+                      <th>成交金额(¥)</th>
+                      <th>中控开讲时间</th>
+                    </tr>
+                  </thead>
+                  <tbody id="productsTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head"><h3>场次排期与基础信息</h3></div>
+              <div id="sessionMetaGrid" class="meta-grid"></div>
+            </div>
+          </div>
+
+          <!-- TAB 2: Timeline -->
+          <div class="tab-pane hidden" id="pane-timeline">
+            <div class="card">
+              <div class="card-head">
+                <h3>双平台延迟校准状态 <span id="latencyStatusBadge" class="tag tag-amber">⚠️ 未实测初值</span></h3>
+              </div>
+              <div id="lagHintBox" class="lag-hint unmeasured"></div>
+            </div>
+
+            <div class="card">
+              <div class="card-head">
+                <h3>双平台在线曲线 × 出单脉冲 × 商品上架/开讲节点</h3>
+                <span class="muted">蓝线=视频号在线 · 绿线=MK实时曲线 · 红线=校准后出单高峰 · <b style="color:#ea580c;">橙线=商品上架/开讲</b></span>
+              </div>
+              <div id="timelineChart" class="chart-wrap"></div>
+              <div id="commodityEventsStrip" class="commodity-strip hidden"></div>
+            </div>
+
+            <div class="card">
+              <div class="card-head"><h3>延迟校准后的「出单高峰 ↔ 演播室触发原话」</h3></div>
+              <div id="dealPeaksList" class="peaks-list"></div>
+            </div>
+          </div>
+
+          <!-- TAB 3: AI Review -->
+          <div class="tab-pane hidden" id="pane-review">
+            <div class="grid-2">
+              <div class="card">
+                <div class="card-head">
+                  <h3>精简出单点 / 内容复盘摘要</h3>
+                  <button id="btnCopyDealPoints" class="btn btn-outline btn-xs">一键复制</button>
+                </div>
+                <pre id="reviewDealPoints" class="markdown-box" style="max-height:260px;">本场暂未生成复盘摘要。</pre>
+              </div>
+              <div class="card">
+                <div class="card-head"><h3>心理行业合规扫描 & 下场优化清单</h3></div>
+                <div id="complianceList" class="compliance-list"></div>
+                <h4 style="margin:12px 0 6px;font-size:13px;">下一场可执行优化清单</h4>
+                <ul id="nextActionsList" class="actions-list"></ul>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head">
+                <h3>完整复盘报告</h3>
+                <span id="reviewEngineBadge" class="tag"></span>
+              </div>
+              <pre id="reviewFullMarkdown" class="markdown-box">本场暂未生成完整复盘报告。</pre>
+            </div>
+          </div>
+
+          <!-- TAB 4: Transcript & Orders -->
+          <div class="tab-pane hidden" id="pane-materials">
+            <div class="grid-2">
+              <div class="card">
+                <div class="card-head">
+                  <h3>逐字稿检索 <span id="transcriptMetaBadge" class="tag"></span></h3>
+                  <input id="transcriptSearch" type="search" placeholder="搜关键词（如 订金/训练营/案例）" style="width:210px;" />
+                </div>
+                <div id="transcriptList" class="scroll-list"></div>
+              </div>
+              <div class="card">
+                <div class="card-head">
+                  <h3>直播时间窗内订单明细（已脱敏） <span id="ordersMetaBadge" class="tag"></span></h3>
+                </div>
+                <div id="ordersList" class="scroll-list"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Modal: Cross-Session Analytics -->
+  <div id="modalAnalytics" class="modal hidden">
+    <div class="modal-card modal-xl">
+      <div class="modal-head">
+        <h3>📊 跨场次对比看板（大咖内容 × 留存 × 带单 × 退单红黄灯）</h3>
+        <button class="close-btn" data-close="modalAnalytics">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="inline-group" style="margin-bottom:12px;flex-wrap:wrap;" id="analyticsBlineFilters">
+          <button class="btn btn-outline btn-xs an-filter active" data-bline="">全部有效场次</button>
+          <button class="btn btn-outline btn-xs an-filter" data-bline="nurture">大咖督导 / 咨询观摩</button>
+          <button class="btn btn-outline btn-xs an-filter" data-bline="pro_course">专业课 / 训练营</button>
+          <button class="btn btn-outline btn-xs an-filter" data-bline="group_supervision">团督</button>
+          <button class="btn btn-outline btn-xs an-filter" data-bline="platform_live">平台直播</button>
+        </div>
+        <div class="kpi-grid-4" id="analyticsKpiGrid"></div>
+        <div class="sub-tabs" id="analyticsSubTabs" style="margin-top:12px;">
+          <button class="sub-tab active" data-antab="speakers">1. 讲师横向对比榜</button>
+          <button class="sub-tab" data-antab="refunds">2. 退单率红黄灯预警榜</button>
+          <button class="sub-tab" data-antab="topics">3. 议题 / 流派对比榜</button>
+        </div>
+        <div id="anPane-speakers" class="table-wrap"></div>
+        <div id="anPane-refunds" class="table-wrap hidden"></div>
+        <div id="anPane-topics" class="table-wrap hidden"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="./app.js"></script>
+</body>
+</html>
