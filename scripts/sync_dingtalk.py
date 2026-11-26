@@ -2000,6 +2000,13 @@ def main() -> int:
         live_sync_config=live_sync_cfg,
     )
 
+    # Always write lightweight non-sensitive check timestamp for Pages deploy (not committed to git)
+    checked_at = dt.datetime.now(SHANGHAI_TZ).strftime("%Y-%m-%d %H:%M:%S")
+    (out_dir / "data" / "last-check.json").write_text(
+        json.dumps({"checkedAt": checked_at, "changed": changed}, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
     conflicts = sum(1 for e in events if e["isConflict"])
     undated = sum(1 for e in events if not e["date"])
     target_desc = f"{out_dir / 'data' / 'schedule.enc.json'}（AES-256-GCM 加密）" if password else f"{out_dir / 'data' / 'schedule.json'} 与 {out_dir / 'calendar.ics'}"
