@@ -277,18 +277,19 @@
       const hasTr = (s.transcript_count || 0) > 0;
       const hasTl = (s.timeline_count || 0) > 0 || (s.order_rows_count || 0) > 0;
       const prodCnt = s.product_count || 0;
-      const totalOrders = (s.ch_orders || 0) + (s.mk_orders || 0);
+      const isNurture = s.business_line === "nurture";
+      const totalOrders = isNurture ? (s.mk_orders || 0) : (s.ch_orders || 0) + (s.mk_orders || 0);
       const metricLine =
-        s.review_mode === "content"
-          ? `完看 ${esc(s.mk_finish_rate || "-")} · 观看 ${(s.mk_watch || 0) + (s.ch_watch || 0)} · 讨论 ${s.mk_discuss || 0}${totalOrders > 0 ? ` · 附带${totalOrders}单` : ""}`
+        isNurture
+          ? `MK 观 ${s.mk_watch || 0} · 完看 ${esc(s.mk_finish_rate || "-")} · 讨论 ${s.mk_discuss || 0}${totalOrders > 0 ? ` · ${totalOrders}单` : ""}`
           : `视频号 ${s.ch_watch || 0}观/${s.ch_orders || 0}单 · MK ${s.mk_watch || 0}观/${s.mk_orders || 0}单`;
 
       let refundDot = "";
-      if (s.ch_refund_alert === "red" || s.mk_refund_alert === "red") {
-        const isCh = s.ch_refund_alert === "red";
+      if ((!isNurture && s.ch_refund_alert === "red") || s.mk_refund_alert === "red") {
+        const isCh = !isNurture && s.ch_refund_alert === "red";
         refundDot = `<span class="dot danger">🔴 ${isCh ? "视" : "MK"}退${fmtPct(isCh ? s.ch_refund_rate : s.mk_refund_rate)}</span>`;
-      } else if (s.ch_refund_alert === "yellow" || s.mk_refund_alert === "yellow") {
-        const isCh = s.ch_refund_alert === "yellow";
+      } else if ((!isNurture && s.ch_refund_alert === "yellow") || s.mk_refund_alert === "yellow") {
+        const isCh = !isNurture && s.ch_refund_alert === "yellow";
         refundDot = `<span class="dot warn">🟡 ${isCh ? "视" : "MK"}退${fmtPct(isCh ? s.ch_refund_rate : s.mk_refund_rate)}</span>`;
       }
 
@@ -313,7 +314,7 @@
             <span>${metricLine}</span>
           </div>
           <div class="si-dots">
-            <span class="dot ${hasCh ? "on" : ""}">视频号</span>
+            ${isNurture ? "" : `<span class="dot ${hasCh ? "on" : ""}">视频号</span>`}
             <span class="dot ${hasMk ? "on" : ""}">MK</span>
             <span class="dot ${prodCnt > 0 ? "prod" : ""}">品(${prodCnt})</span>
             <span class="dot ${hasTr ? "on" : ""}">逐字稿(${s.transcript_count || 0})</span>
@@ -388,7 +389,10 @@
     $("heroTitle").textContent = s.title || "-";
     $("heroMeta").textContent = `${s.date_str || ""} ${s.weekday || ""} ${s.start_time || ""}${s.end_time ? "-" + s.end_time : ""} · 讲师：${s.speaker || "-"} · 主持人：${s.host || "-"} · 课程/挂品：${s.course_name || (prods[0] && prods[0].spu_name) || "-"}`;
 
-    $("nurtureBanner").classList.toggle("hidden", s.review_mode !== "content");
+    const isNurture = s.business_line === "nurture";
+    $("nurtureBanner").classList.toggle("hidden", !isNurture);
+    if ($("chMetricsCard")) $("chMetricsCard").classList.toggle("hidden", isNurture);
+    if ($("mkMetricsCard")) $("mkMetricsCard").style.gridColumn = isNurture ? "1 / -1" : "";
 
     $("chMetricsGrid").innerHTML = [
       statCell("预约人数", ch.reserve_count || 0),
@@ -584,7 +588,12 @@
                 <div><span class="tag tag-red">${pk.order_count} 单 / ¥${pk.gmv}</span> <span class="tag">${esc((pk.platforms || []).join("+"))}</span></div>
               </div>
               <div class="muted">商品：${esc((pk.products || []).join(" / ") || "-")} · 渠道：${esc((pk.channels || []).join(" / ") || "-")}</div>
-              ${quotes || `<div class="muted" style="margin-top:6px;">该时间窗口暂未匹配到逐字稿。</div>`}
+              ${
+                quotes ||
+                (pk.post_content_pitch_note
+                  ? `<div class="quote-line" style="background:#fffbeb;border:1px solid #fcd34d;color:#92400e;">${esc(pk.post_content_pitch_note)}</div>`
+                  : `<div class="muted" style="margin-top:6px;">该时间窗口暂未匹配到逐字稿。</div>`)
+              }
             </div>`;
           })
           .join("")
