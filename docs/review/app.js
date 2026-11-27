@@ -240,7 +240,7 @@
     const q = state.searchQuery.trim().toLowerCase();
     if (q) {
       list = list.filter((s) =>
-        `${s.title || ""} ${s.speaker || ""} ${s.host || ""} ${s.course_name || ""} ${s.product_names || ""} ${s.mk_live_id || ""} ${s.date_str || ""}`
+        `${s.title || ""} ${s.speaker || ""} ${s.host || ""} ${s.course_name || ""} ${s.product_names || ""} ${s.channels_account || ""} ${s.mk_live_id || ""} ${s.date_str || ""}`
           .toLowerCase()
           .includes(q)
       );
@@ -379,11 +379,13 @@
       heroRefundTag += refundAlertBadge(mk.refund_alert, mk.refund_rate, mk.refund_count, "MK ");
     }
 
+    const isNurtureHero = s.business_line === "nurture";
     $("heroTags").innerHTML = `
       <span class="tag ${bm.cls}">${bm.label}</span>
       <span class="tag tag-amber">${modeLabel}</span>
+      ${!isNurtureHero && s.channels_account ? `<span class="tag tag-blue">📺 ${esc(s.channels_account)}</span>` : ""}
       ${s.mk_live_id ? `<span class="tag">MK ID: ${esc(s.mk_live_id)}</span>` : ""}
-      ${s.channels_live_id ? `<span class="tag">视频号 ID: ${esc(s.channels_live_id)}</span>` : ""}
+      ${!isNurtureHero && s.channels_live_id ? `<span class="tag">视频号 ID: ${esc(s.channels_live_id)}</span>` : ""}
       ${heroRefundTag}
     `;
     $("heroTitle").textContent = s.title || "-";
